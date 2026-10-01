@@ -321,18 +321,33 @@ function analyzeMethodologyIntelligence(text) {
     'thematic analysis', 'semi-structured interview', 'in-depth interview',
     'qualitative', 'purposive sampling', 'braun and clarke', 'coding',
     'transcription', 'phenomenology', 'grounded theory', 'case study',
-    'focus group', 'interview guide', 'triangulation', 'member checking'
+    'focus group', 'interview guide', 'triangulation', 'member checking',
+    'content analysis'
   ];
 
   const quantTerms = [
     'regression', 'hypothesis', 'hypotheses', 'pls-sem', 'structural equation',
-    'quantitative', 'likert scale', 'independent variable', 'dependent variable',
-    'p-value', 'cronbach', 'sample size', 'r-squared', 'descriptive statistics',
-    'inferential statistics', 'spss', 'smartpls', 'anova', 'correlation'
+    'quantitative', 'likert', 'likert scale', 'independent variable', 'dependent variable',
+    'p-value', 'cronbach', "cronbach's alpha", 'sample size', 'r-squared', 'descriptive statistics',
+    'inferential statistics', 'spss', 'smartpls', 'anova', 'correlation',
+    'econometric', 'econometrics', 'variance', 'multivariate', 'factor analysis'
+  ];
+
+  const msbaKeywords = [
+    'msba', 'business analytics', 'proton', 'proton holdings', 'research method',
+    'research methods', 'research methodology', 'research design', 'empirical study',
+    'conceptual framework', 'theoretical framework', 'digital transformation',
+    'literature review', 'secondary data', 'primary data', 'data analytics',
+    'business intelligence'
   ];
 
   const qualHits = qualTerms.filter(t => lower.includes(t));
   const quantHits = quantTerms.filter(t => lower.includes(t));
+  const msbaHits = msbaKeywords.filter(t => lower.includes(t));
+
+  const hasHypotheses = /h[1-5]\s*:/i.test(text) || /hypothesis\s*[1-5]/i.test(text);
+  const hasSamplingStrategy = /sampling\s+(?:strategy|method|technique)|purposive|stratified|random/i.test(text);
+  const hasDataCollection = /data\s+collection|interviews?|surveys?|questionnaires?/i.test(text);
 
   let detectedType = 'General Academic Research';
   if (qualHits.length >= 2 && quantHits.length >= 2) {
@@ -343,13 +358,21 @@ function analyzeMethodologyIntelligence(text) {
     detectedType = 'Quantitative Research Methodology';
   }
 
+  // Detect if content is related to MSBA or Academic Research Methods
+  const isMsbaRelated = 
+    msbaHits.length > 0 ||
+    qualHits.length >= 1 ||
+    quantHits.length >= 1 ||
+    hasHypotheses;
+
   return {
+    isMsbaRelated,
     detectedType,
     qualitativeTermsFound: qualHits.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
     quantitativeTermsFound: quantHits.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
-    hasHypotheses: /h[1-5]\s*:/i.test(text) || /hypothesis\s*[1-5]/i.test(text),
-    hasSamplingStrategy: /sampling\s+(?:strategy|method|technique)|purposive|stratified|random/i.test(text),
-    hasDataCollection: /data\s+collection|interviews?|surveys?|questionnaires?/i.test(text)
+    hasHypotheses,
+    hasSamplingStrategy,
+    hasDataCollection
   };
 }
 
@@ -556,6 +579,11 @@ export default async function handler(req, res) {
     const citationResult = analyzeLiteratureAndCitations(text);
     const methodologyResult = analyzeMethodologyIntelligence(text);
 
+    // If citations and references are detected, mark as academic/MSBA research as well
+    if (citationResult.totalCitations >= 2 && citationResult.hasReferenceSection) {
+      methodologyResult.isMsbaRelated = true;
+    }
+
     return res.status(200).json({
       score: plagiarismResult.score,
       aiProbability: aiResult.aiProbability,
@@ -566,6 +594,7 @@ export default async function handler(req, res) {
       contextAnalysis: contextResult,
       citationAudit: citationResult,
       methodologyAnalysis: methodologyResult,
+      isMsbaRelated: methodologyResult.isMsbaRelated,
       wordCount: citationResult.totalWords,
       text: text
     });

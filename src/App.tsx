@@ -58,6 +58,7 @@ type CitationAudit = {
 };
 
 type MethodologyAnalysis = {
+  isMsbaRelated?: boolean;
   detectedType: string;
   qualitativeTermsFound: string[];
   quantitativeTermsFound: string[];
@@ -77,6 +78,7 @@ type Result = {
   contextAnalysis?: ContextAnalysis;
   citationAudit?: CitationAudit;
   methodologyAnalysis?: MethodologyAnalysis;
+  isMsbaRelated?: boolean;
   wordCount?: number;
 };
 
@@ -237,6 +239,7 @@ function App() {
         totalWords: text.trim().split(/\s+/).filter(Boolean).length
       },
       methodologyAnalysis: {
+        isMsbaRelated: false,
         detectedType: 'General Analysis',
         qualitativeTermsFound: [],
         quantitativeTermsFound: [],
@@ -244,8 +247,12 @@ function App() {
         hasSamplingStrategy: false,
         hasDataCollection: false
       },
+      isMsbaRelated: false,
       wordCount: text.trim().split(/\s+/).filter(Boolean).length
     });
+    if (activeTab === 'citations' || activeTab === 'methodology') {
+      setActiveTab('matches');
+    }
   };
 
   const handleCheck = async () => {
@@ -270,6 +277,10 @@ function App() {
       }
 
       const data = await response.json();
+      const isMsba = Boolean(data.methodologyAnalysis?.isMsbaRelated || data.isMsbaRelated);
+      if (!isMsba && (activeTab === 'citations' || activeTab === 'methodology')) {
+        setActiveTab('matches');
+      }
       setResult(data);
     } catch (err) {
       console.warn("Backend unavailable, using client fallback:", err);
@@ -286,6 +297,8 @@ function App() {
   const handleDownloadReport = () => {
     alert("Report downloading would trigger here.");
   };
+
+  const isMsba = Boolean(result?.methodologyAnalysis?.isMsbaRelated || result?.isMsbaRelated);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8 font-sans">
@@ -396,8 +409,15 @@ function App() {
 
         {result && (
           <section className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden animate-fade-in-up">
-            <div className="p-6 sm:p-8 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Multi-API Consensus Report</h2>
+            <div className="p-6 sm:p-8 border-b border-gray-100 bg-gray-50 flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold text-gray-900">Multi-API Consensus Report</h2>
+                {isMsba && (
+                  <span className="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1 rounded-full border border-indigo-200">
+                    MSBA & Research Intelligence
+                  </span>
+                )}
+              </div>
               <button onClick={handleDownloadReport} className="text-sm bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded shadow-sm flex items-center gap-2 transition">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 Export PDF
@@ -405,7 +425,7 @@ function App() {
             </div>
             
             <div className="p-6 sm:p-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+              <div className={`grid grid-cols-1 sm:grid-cols-2 ${isMsba ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4 mb-8`}>
                 <div className="bg-white rounded-xl p-5 flex flex-col items-center justify-center border-2 border-red-100 shadow-sm relative overflow-hidden group">
                   <span className="text-4xl font-black text-red-600 relative z-10">{result.score}%</span>
                   <span className="text-red-800 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">Avg Plagiarized</span>
@@ -418,10 +438,12 @@ function App() {
                   <span className="text-4xl font-black text-purple-600 relative z-10">{result.aiProbability}%</span>
                   <span className="text-purple-800 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">Consensus AI Prob</span>
                 </div>
-                <div className="bg-white rounded-xl p-5 flex flex-col items-center justify-center border-2 border-blue-100 shadow-sm relative overflow-hidden group">
-                  <span className="text-4xl font-black text-blue-600 relative z-10">{result.citationAudit?.totalCitations ?? 0}</span>
-                  <span className="text-blue-800 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">APA Citations</span>
-                </div>
+                {isMsba && (
+                  <div className="bg-white rounded-xl p-5 flex flex-col items-center justify-center border-2 border-blue-100 shadow-sm relative overflow-hidden group">
+                    <span className="text-4xl font-black text-blue-600 relative z-10">{result.citationAudit?.totalCitations ?? 0}</span>
+                    <span className="text-blue-800 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">APA Citations</span>
+                  </div>
+                )}
                 <div className="bg-white rounded-xl p-5 flex flex-col items-center justify-center border-2 border-slate-100 shadow-sm relative overflow-hidden group">
                   <span className="text-4xl font-black text-slate-700 relative z-10">{result.wordCount ?? result.text.trim().split(/\s+/).filter(Boolean).length}</span>
                   <span className="text-slate-600 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">Total Words</span>
@@ -436,23 +458,27 @@ function App() {
                   >
                     Plagiarism Breakdown
                   </button>
-                  <button
-                    onClick={() => setActiveTab('citations')}
-                    className={`${activeTab === 'citations' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition flex items-center gap-1.5`}
-                  >
-                    Literature & APA Citations
-                    {result.citationAudit?.totalCitations ? (
-                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">
-                        {result.citationAudit.totalCitations}
-                      </span>
-                    ) : null}
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('methodology')}
-                    className={`${activeTab === 'methodology' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition`}
-                  >
-                    Methodology Intelligence
-                  </button>
+                  {isMsba && (
+                    <button
+                      onClick={() => setActiveTab('citations')}
+                      className={`${activeTab === 'citations' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition flex items-center gap-1.5`}
+                    >
+                      Literature & APA Citations
+                      {result.citationAudit?.totalCitations ? (
+                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                          {result.citationAudit.totalCitations}
+                        </span>
+                      ) : null}
+                    </button>
+                  )}
+                  {isMsba && (
+                    <button
+                      onClick={() => setActiveTab('methodology')}
+                      className={`${activeTab === 'methodology' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition`}
+                    >
+                      Methodology Intelligence
+                    </button>
+                  )}
                   <button
                     onClick={() => setActiveTab('context')}
                     className={`${activeTab === 'context' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition flex items-center gap-1.5`}
@@ -480,7 +506,7 @@ function App() {
               </div>
 
               <div className="min-h-[200px]">
-                {activeTab === 'citations' && (
+                {isMsba && activeTab === 'citations' && (
                   <div className="space-y-6">
                     <div className="bg-blue-50 border border-blue-200 p-6 rounded-xl">
                       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
@@ -553,7 +579,7 @@ function App() {
                   </div>
                 )}
 
-                {activeTab === 'methodology' && (
+                {isMsba && activeTab === 'methodology' && (
                   <div className="space-y-6">
                     <div className="bg-indigo-50 border border-indigo-200 p-6 rounded-xl">
                       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
