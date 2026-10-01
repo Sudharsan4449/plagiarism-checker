@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import * as mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -24,6 +24,7 @@ function App() {
   const [text, setText] = useState('');
   const apiKey = import.meta.env.VITE_EDEN_API_KEY || ''; // Use Vercel env var directly
   
+  const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [isChecking, setIsChecking] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
@@ -31,6 +32,38 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-test API connection on load
+  useEffect(() => {
+    if (!apiKey) {
+      setApiStatus('disconnected');
+      return;
+    }
+
+    const testConnection = async () => {
+      try {
+        // Send a dummy request. 401/403 means bad key. 400 means good key but invalid body (expected).
+        const res = await fetch('https://api.edenai.run/v2/text/ai_detection', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({})
+        });
+        
+        if (res.status === 401 || res.status === 403) {
+          setApiStatus('disconnected');
+        } else {
+          setApiStatus('connected');
+        }
+      } catch (err) {
+        setApiStatus('disconnected');
+      }
+    };
+
+    testConnection();
+  }, [apiKey]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -65,7 +98,6 @@ function App() {
       setErrorMsg("Failed to read the file. It might be corrupted or protected.");
     } finally {
       setIsUploading(false);
-      // Reset input
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -90,8 +122,8 @@ function App() {
 
   const handleCheck = async () => {
     if (!text.trim()) return;
-    if (!apiKey.trim()) {
-      setErrorMsg("API Key is missing. Please add VITE_EDEN_API_KEY in Vercel settings.");
+    if (apiStatus === 'disconnected') {
+      setErrorMsg("API Key is missing or invalid. Please configure VITE_EDEN_API_KEY in Vercel.");
       return;
     }
 
@@ -162,9 +194,24 @@ function App() {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-              Live API Mode
-            </span>
+            {apiStatus === 'checking' && (
+              <span className="bg-gray-100 text-gray-600 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-2 shadow-sm border border-gray-200">
+                <span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse"></span>
+                Connecting...
+              </span>
+            )}
+            {apiStatus === 'connected' && (
+              <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-2 shadow-sm border border-blue-200">
+                <span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm"></span>
+                Live API Mode
+              </span>
+            )}
+            {apiStatus === 'disconnected' && (
+              <span className="bg-red-50 text-red-600 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-2 shadow-sm border border-red-100">
+                <span className="w-2 h-2 rounded-full bg-red-500 shadow-sm"></span>
+                API Disconnected
+              </span>
+            )}
           </div>
         </header>
 
