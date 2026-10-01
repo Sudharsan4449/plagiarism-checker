@@ -334,18 +334,21 @@ function analyzeMethodologyIntelligence(text) {
   ];
 
   const msbaKeywords = [
-    'msba', 'business analytics', 'proton', 'proton holdings', 'research method',
-    'research methods', 'research methodology', 'research design', 'empirical study',
+    'msba', 'business analytics', 'research method', 'research methods',
+    'research methodology', 'research design', 'empirical study', 'empirical research',
     'conceptual framework', 'theoretical framework', 'digital transformation',
     'literature review', 'secondary data', 'primary data', 'data analytics',
-    'business intelligence'
+    'business intelligence', 'predictive analytics', 'prescriptive analytics',
+    'descriptive analytics', 'machine learning', 'data-driven', 'decision making',
+    'case study analysis', 'problem statement', 'research objective', 'research question'
   ];
 
   const qualHits = qualTerms.filter(t => lower.includes(t));
   const quantHits = quantTerms.filter(t => lower.includes(t));
   const msbaHits = msbaKeywords.filter(t => lower.includes(t));
 
-  const hasHypotheses = /h[1-5]\s*:/i.test(text) || /hypothesis\s*[1-5]/i.test(text);
+  const hasHypotheses = /h[0-5]\s*:/i.test(text) || /hypothesis\s*[0-5]/i.test(text);
+  const hasResearchQuestions = /rq[1-5]\s*:/i.test(text) || /research\s+question\s*[1-5]/i.test(text) || /ro[1-5]\s*:/i.test(text) || /research\s+objective\s*[1-5]/i.test(text);
   const hasSamplingStrategy = /sampling\s+(?:strategy|method|technique)|purposive|stratified|random/i.test(text);
   const hasDataCollection = /data\s+collection|interviews?|surveys?|questionnaires?/i.test(text);
 
@@ -358,12 +361,13 @@ function analyzeMethodologyIntelligence(text) {
     detectedType = 'Quantitative Research Methodology';
   }
 
-  // Detect if content is related to MSBA or Academic Research Methods
+  // Detect if content is related to MSBA or Academic Research Methods across any company, assessment or domain
   const isMsbaRelated = 
     msbaHits.length > 0 ||
     qualHits.length >= 1 ||
     quantHits.length >= 1 ||
-    hasHypotheses;
+    hasHypotheses ||
+    hasResearchQuestions;
 
   return {
     isMsbaRelated,
