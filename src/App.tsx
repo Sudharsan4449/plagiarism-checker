@@ -113,7 +113,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'matches' | 'citations' | 'methodology' | 'context' | 'ai' | 'grammar'>('matches');
   const [errorMsg, setErrorMsg] = useState('');
   const [showReconstruction, setShowReconstruction] = useState(false);
-  const [reconstructedTab, setReconstructedTab] = useState<'manuscript' | 'references' | 'notes' | 'compare'>('manuscript');
+  const [reconstructedTab, setReconstructedTab] = useState<'manuscript' | 'references' | 'methodology' | 'notes' | 'compare'>('manuscript');
   const [citationMode, setCitationMode] = useState<'with' | 'without'>('with');
   const [copiedText, setCopiedText] = useState(false);
   const [copiedReferences, setCopiedReferences] = useState(false);
@@ -434,6 +434,98 @@ function App() {
   };
 
   const isMsba = Boolean(result?.methodologyAnalysis?.isMsbaRelated || result?.isMsbaRelated);
+
+  const renderMethodologyIntelligence = () => {
+    const methodology = result?.methodologyAnalysis;
+    return (
+      <div className="space-y-6">
+        <div className="bg-neutral-50 border-l-4 border-[#ffd200] border-y border-r border-neutral-200 p-6 rounded-sm">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+            <h3 className="font-black text-black text-lg flex items-center gap-2">
+              <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+              Research Methodology Intelligence
+            </h3>
+            <span className="bg-black text-[#ffd200] text-xs font-extrabold px-3 py-1 rounded-sm uppercase tracking-wider">
+              {methodology?.detectedType || 'Research Classification Active'}
+            </span>
+          </div>
+          <p className="text-sm text-neutral-600">
+            Our engine automatically infers the underlying research methodology directly from your submitted answer text.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-sm border border-neutral-200 shadow-xs flex items-center justify-between hover:border-black transition-colors">
+            <div>
+              <span className="text-xs font-extrabold text-neutral-500 uppercase tracking-widest block">Hypotheses Formulation</span>
+              <span className="text-sm font-bold text-black mt-1 block">
+                {methodology?.hasHypotheses ? '✓ Formal Hypotheses Found' : '— None Detected'}
+              </span>
+            </div>
+            <span className={`w-3 h-3 rounded-sm ${methodology?.hasHypotheses ? 'bg-[#ffd200]' : 'bg-neutral-300'}`}></span>
+          </div>
+
+          <div className="bg-white p-5 rounded-sm border border-neutral-200 shadow-xs flex items-center justify-between hover:border-black transition-colors">
+            <div>
+              <span className="text-xs font-extrabold text-neutral-500 uppercase tracking-widest block">Sampling Strategy</span>
+              <span className="text-sm font-bold text-black mt-1 block">
+                {methodology?.hasSamplingStrategy ? '✓ Strategy Discussed' : '— None Detected'}
+              </span>
+            </div>
+            <span className={`w-3 h-3 rounded-sm ${methodology?.hasSamplingStrategy ? 'bg-[#ffd200]' : 'bg-neutral-300'}`}></span>
+          </div>
+
+          <div className="bg-white p-5 rounded-sm border border-neutral-200 shadow-xs flex items-center justify-between hover:border-black transition-colors">
+            <div>
+              <span className="text-xs font-extrabold text-neutral-500 uppercase tracking-widest block">Data Collection Protocol</span>
+              <span className="text-sm font-bold text-black mt-1 block">
+                {methodology?.hasDataCollection ? '✓ Methods Specified' : '— None Detected'}
+              </span>
+            </div>
+            <span className={`w-3 h-3 rounded-sm ${methodology?.hasDataCollection ? 'bg-[#ffd200]' : 'bg-neutral-300'}`}></span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white border border-neutral-200 rounded-sm p-6 shadow-xs">
+            <h4 className="font-extrabold text-black uppercase tracking-wider text-xs mb-3 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-black"></span>
+              Qualitative Concepts Identified
+            </h4>
+            {methodology?.qualitativeTermsFound?.length ? (
+              <div className="flex flex-wrap gap-2">
+                {methodology.qualitativeTermsFound.map((term, i) => (
+                  <span key={i} className="bg-neutral-100 text-black text-xs font-bold px-3 py-1 rounded-sm border border-neutral-300">
+                    {term}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-400">No specific qualitative methodology terms identified in this answer.</p>
+            )}
+          </div>
+
+          <div className="bg-white border border-neutral-200 rounded-sm p-6 shadow-xs">
+            <h4 className="font-extrabold text-black uppercase tracking-wider text-xs mb-3 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-black"></span>
+              Quantitative Concepts Identified
+            </h4>
+            {methodology?.quantitativeTermsFound?.length ? (
+              <div className="flex flex-wrap gap-2">
+                {methodology.quantitativeTermsFound.map((term, i) => (
+                  <span key={i} className="bg-neutral-100 text-black text-xs font-bold px-3 py-1 rounded-sm border border-neutral-300">
+                    {term}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-400">No specific quantitative methodology terms identified in this answer.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#fafafa] py-10 px-4 sm:px-6 lg:px-8 font-sans text-neutral-900">
@@ -808,94 +900,7 @@ function App() {
                   </div>
                 )}
 
-                {isMsba && activeTab === 'methodology' && (
-                  <div className="space-y-6">
-                    <div className="bg-neutral-50 border-l-4 border-[#ffd200] border-y border-r border-neutral-200 p-6 rounded-sm">
-                      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                        <h3 className="font-black text-black text-lg flex items-center gap-2">
-                          <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                          Research Methodology Intelligence
-                        </h3>
-                        <span className="bg-black text-[#ffd200] text-xs font-extrabold px-3 py-1 rounded-sm uppercase tracking-wider">
-                          {result.methodologyAnalysis?.detectedType || 'Research Classification Active'}
-                        </span>
-                      </div>
-                      <p className="text-sm text-neutral-600">
-                        Our engine automatically infers the underlying research methodology directly from your submitted answer text.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-white p-5 rounded-sm border border-neutral-200 shadow-xs flex items-center justify-between hover:border-black transition-colors">
-                        <div>
-                          <span className="text-xs font-extrabold text-neutral-500 uppercase tracking-widest block">Hypotheses Formulation</span>
-                          <span className="text-sm font-bold text-black mt-1 block">
-                            {result.methodologyAnalysis?.hasHypotheses ? '✓ Formal Hypotheses Found' : '— None Detected'}
-                          </span>
-                        </div>
-                        <span className={`w-3 h-3 rounded-sm ${result.methodologyAnalysis?.hasHypotheses ? 'bg-[#ffd200]' : 'bg-neutral-300'}`}></span>
-                      </div>
-
-                      <div className="bg-white p-5 rounded-sm border border-neutral-200 shadow-xs flex items-center justify-between hover:border-black transition-colors">
-                        <div>
-                          <span className="text-xs font-extrabold text-neutral-500 uppercase tracking-widest block">Sampling Strategy</span>
-                          <span className="text-sm font-bold text-black mt-1 block">
-                            {result.methodologyAnalysis?.hasSamplingStrategy ? '✓ Strategy Discussed' : '— None Detected'}
-                          </span>
-                        </div>
-                        <span className={`w-3 h-3 rounded-sm ${result.methodologyAnalysis?.hasSamplingStrategy ? 'bg-[#ffd200]' : 'bg-neutral-300'}`}></span>
-                      </div>
-
-                      <div className="bg-white p-5 rounded-sm border border-neutral-200 shadow-xs flex items-center justify-between hover:border-black transition-colors">
-                        <div>
-                          <span className="text-xs font-extrabold text-neutral-500 uppercase tracking-widest block">Data Collection Protocol</span>
-                          <span className="text-sm font-bold text-black mt-1 block">
-                            {result.methodologyAnalysis?.hasDataCollection ? '✓ Methods Specified' : '— None Detected'}
-                          </span>
-                        </div>
-                        <span className={`w-3 h-3 rounded-sm ${result.methodologyAnalysis?.hasDataCollection ? 'bg-[#ffd200]' : 'bg-neutral-300'}`}></span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-white border border-neutral-200 rounded-sm p-6 shadow-xs">
-                        <h4 className="font-extrabold text-black uppercase tracking-wider text-xs mb-3 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-black"></span>
-                          Qualitative Concepts Identified
-                        </h4>
-                        {result.methodologyAnalysis?.qualitativeTermsFound?.length ? (
-                          <div className="flex flex-wrap gap-2">
-                            {result.methodologyAnalysis.qualitativeTermsFound.map((term, i) => (
-                              <span key={i} className="bg-neutral-100 text-black text-xs font-bold px-3 py-1 rounded-sm border border-neutral-300">
-                                {term}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-neutral-400">No specific qualitative methodology terms identified in this answer.</p>
-                        )}
-                      </div>
-
-                      <div className="bg-white border border-neutral-200 rounded-sm p-6 shadow-xs">
-                        <h4 className="font-extrabold text-black uppercase tracking-wider text-xs mb-3 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-black"></span>
-                          Quantitative Concepts Identified
-                        </h4>
-                        {result.methodologyAnalysis?.quantitativeTermsFound?.length ? (
-                          <div className="flex flex-wrap gap-2">
-                            {result.methodologyAnalysis.quantitativeTermsFound.map((term, i) => (
-                              <span key={i} className="bg-neutral-100 text-black text-xs font-bold px-3 py-1 rounded-sm border border-neutral-300">
-                                {term}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-neutral-400">No specific quantitative methodology terms identified in this answer.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {isMsba && activeTab === 'methodology' && renderMethodologyIntelligence()}
 
                 {activeTab === 'context' && (
                   <div className="space-y-6">
@@ -1280,13 +1285,13 @@ function App() {
               <div className="border-b border-neutral-200 mb-6 flex space-x-6 sm:space-x-8 overflow-x-auto">
                 <button
                   onClick={() => setReconstructedTab('manuscript')}
-                  className={`${reconstructedTab === 'manuscript' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition`}
+                  className={`${reconstructedTab === 'manuscript' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition whitespace-nowrap`}
                 >
                   Reconstructed Academic Manuscript
                 </button>
                 <button
                   onClick={() => setReconstructedTab('references')}
-                  className={`${reconstructedTab === 'references' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5`}
+                  className={`${reconstructedTab === 'references' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5 whitespace-nowrap`}
                 >
                   APA 7th References (Separate Section)
                   <span className="bg-[#ffd200] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-sm">
@@ -1294,19 +1299,25 @@ function App() {
                   </span>
                 </button>
                 <button
+                  onClick={() => setReconstructedTab('compare')}
+                  className={`${reconstructedTab === 'compare' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition whitespace-nowrap`}
+                >
+                  Original Input vs Reconstructed Comparison
+                </button>
+                <button
+                  onClick={() => setReconstructedTab('methodology')}
+                  className={`${reconstructedTab === 'methodology' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition whitespace-nowrap`}
+                >
+                  Methodological Intelligence
+                </button>
+                <button
                   onClick={() => setReconstructedTab('notes')}
-                  className={`${reconstructedTab === 'notes' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5`}
+                  className={`${reconstructedTab === 'notes' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5 whitespace-nowrap`}
                 >
                   APA Sourcing & Literature Notes
                   <span className="bg-[#ffd200] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-sm">
                     {activeVariant?.citationNotes.length ?? 0} Notes
                   </span>
-                </button>
-                <button
-                  onClick={() => setReconstructedTab('compare')}
-                  className={`${reconstructedTab === 'compare' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition`}
-                >
-                  Original Input vs Reconstructed Comparison
                 </button>
               </div>
 
@@ -1504,38 +1515,63 @@ function App() {
                 </div>
               )}
 
-              {/* TAB 4: SIDE-BY-SIDE COMPARISON */}
+              {/* TAB 3: SIDE-BY-SIDE COMPARISON & METHODOLOGICAL INTELLIGENCE */}
               {reconstructedTab === 'compare' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Left: Original Input */}
-                  <div className="bg-white border border-neutral-200 rounded-sm p-6 shadow-xs">
-                    <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
-                      <span className="text-xs font-extrabold uppercase tracking-widest text-neutral-500">
-                        Original Raw Submission ({reconstructedData.wordCount} words)
-                      </span>
-                      <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded font-mono font-bold">
-                        Pre-Reconstruction
-                      </span>
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Left: Original Input */}
+                    <div className="bg-white border border-neutral-200 rounded-sm p-6 shadow-xs">
+                      <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
+                        <span className="text-xs font-extrabold uppercase tracking-widest text-neutral-500">
+                          Original Raw Submission ({reconstructedData.wordCount} words)
+                        </span>
+                        <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded font-mono font-bold">
+                          Pre-Reconstruction
+                        </span>
+                      </div>
+                      <div className="text-sm font-mono whitespace-pre-wrap leading-relaxed text-neutral-800 max-h-[600px] overflow-y-auto pr-2">
+                        {result?.text}
+                      </div>
                     </div>
-                    <div className="text-sm font-mono whitespace-pre-wrap leading-relaxed text-neutral-800 max-h-[600px] overflow-y-auto pr-2">
-                      {result?.text}
+
+                    {/* Right: Reconstructed Academic Paper */}
+                    <div className="bg-white border-2 border-black rounded-sm p-6 shadow-xs">
+                      <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
+                        <span className="text-xs font-black uppercase tracking-widest text-black">
+                          Reconstructed Scholarly Text {citationMode === 'without' && !reconstructedData.userProvidedCitations ? '(Clean / No Citations)' : '(APA 7th + Times New Roman 1.5)'}
+                        </span>
+                        <span className="text-[10px] bg-[#ffd200] text-black px-2 py-0.5 rounded font-mono font-black">
+                          Assessment Compliant
+                        </span>
+                      </div>
+                      <div className="text-sm font-serif leading-[1.8] text-justify text-neutral-900 max-h-[600px] overflow-y-auto pr-2 whitespace-pre-wrap">
+                        {activeVariant?.plainText || reconstructedData.reconstructedPlainText}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Right: Reconstructed Academic Paper */}
-                  <div className="bg-white border-2 border-black rounded-sm p-6 shadow-xs">
-                    <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
-                      <span className="text-xs font-black uppercase tracking-widest text-black">
-                        Reconstructed Scholarly Text {citationMode === 'without' && !reconstructedData.userProvidedCitations ? '(Clean / No Citations)' : '(APA 7th + Times New Roman 1.5)'}
-                      </span>
-                      <span className="text-[10px] bg-[#ffd200] text-black px-2 py-0.5 rounded font-mono font-black">
-                        Assessment Compliant
+                  {/* Section near Original and Reconstructed: Methodological Intelligence */}
+                  <div className="bg-white border-2 border-black rounded-sm p-6 sm:p-8 shadow-xs">
+                    <div className="flex items-center justify-between border-b border-neutral-200 pb-4 mb-6">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-[#ffd200] border border-black rounded-full"></span>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                          Methodological Intelligence (Analytical Alignment)
+                        </h3>
+                      </div>
+                      <span className="text-[10px] bg-black text-[#ffd200] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                        Methodology Analysis
                       </span>
                     </div>
-                    <div className="text-sm font-serif leading-[1.8] text-justify text-neutral-900 max-h-[600px] overflow-y-auto pr-2 whitespace-pre-wrap">
-                      {activeVariant?.plainText || reconstructedData.reconstructedPlainText}
-                    </div>
+                    {renderMethodologyIntelligence()}
                   </div>
+                </div>
+              )}
+
+              {/* TAB 4: DEDICATED METHODOLOGICAL INTELLIGENCE TAB */}
+              {reconstructedTab === 'methodology' && (
+                <div className="max-w-4xl mx-auto bg-white border-2 border-black rounded-sm p-6 sm:p-8 shadow-xs">
+                  {renderMethodologyIntelligence()}
                 </div>
               )}
             </div>
