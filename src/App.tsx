@@ -116,6 +116,7 @@ function App() {
   const [reconstructedTab, setReconstructedTab] = useState<'manuscript' | 'references' | 'notes' | 'compare'>('manuscript');
   const [citationMode, setCitationMode] = useState<'with' | 'without'>('with');
   const [copiedText, setCopiedText] = useState(false);
+  const [copiedReferences, setCopiedReferences] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const touchStartY = useRef<number | null>(null);
@@ -403,34 +404,31 @@ function App() {
   };
 
   const handleCopyReconstructed = () => {
-    let textToCopy = '';
-    if (reconstructedTab === 'references') {
-      textToCopy = activeVariant?.referencesPlainText || '';
-    } else {
-      textToCopy = activeVariant ? activeVariant.plainText : (reconstructedData?.reconstructedPlainText || '');
-    }
+    const textToCopy = activeVariant ? activeVariant.plainText : reconstructedData?.reconstructedPlainText;
     if (!textToCopy) return;
     navigator.clipboard.writeText(textToCopy);
     setCopiedText(true);
     setTimeout(() => setCopiedText(false), 2000);
   };
 
+  const handleCopyReferences = () => {
+    const refsToCopy = activeVariant?.referencesPlainText || reconstructedData?.referencesPlainText;
+    if (!refsToCopy) return;
+    navigator.clipboard.writeText(refsToCopy);
+    setCopiedReferences(true);
+    setTimeout(() => setCopiedReferences(false), 2000);
+  };
+
   const handleDownloadDoc = () => {
-    let textToDownload = '';
-    let fileName = '';
-    if (reconstructedTab === 'references') {
-      textToDownload = activeVariant?.referencesPlainText || '';
-      fileName = `References_APA7th_${Date.now()}.txt`;
-    } else {
-      textToDownload = activeVariant ? activeVariant.plainText : (reconstructedData?.reconstructedPlainText || '');
-      fileName = `Reconstructed_Academic_Submission_${citationMode === 'without' && !reconstructedData?.userProvidedCitations ? 'Clean' : 'APA'}_${Date.now()}.txt`;
-    }
-    if (!textToDownload) return;
-    const blob = new Blob([textToDownload], { type: 'text/plain;charset=utf-8' });
+    const manuscriptText = activeVariant ? activeVariant.plainText : (reconstructedData?.reconstructedPlainText || '');
+    const refsText = activeVariant?.referencesPlainText || (reconstructedData?.referencesPlainText || '');
+    const fullText = refsText ? `${manuscriptText}\n\n\n${refsText}` : manuscriptText;
+    if (!fullText) return;
+    const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName;
+    a.download = `Reconstructed_Academic_Submission_${citationMode === 'without' && !reconstructedData?.userProvidedCitations ? 'Clean' : 'APA'}_${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1152,16 +1150,29 @@ function App() {
                   className="bg-white hover:bg-neutral-50 border border-neutral-300 hover:border-black text-black font-bold text-xs uppercase tracking-wider py-2 px-3.5 rounded-sm transition flex items-center gap-1.5 shadow-xs"
                 >
                   {copiedText ? (
-                    <>
-                      <span className="text-emerald-600 font-extrabold">✓ Copied!</span>
-                    </>
+                    <span className="text-emerald-600 font-extrabold">✓ Copied Content!</span>
                   ) : (
                     <>
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                      Copy Text
+                      Copy Content
                     </>
                   )}
                 </button>
+                {activeVariant && activeVariant.references.length > 0 && (
+                  <button
+                    onClick={handleCopyReferences}
+                    className="bg-white hover:bg-neutral-50 border border-neutral-300 hover:border-black text-black font-bold text-xs uppercase tracking-wider py-2 px-3.5 rounded-sm transition flex items-center gap-1.5 shadow-xs"
+                  >
+                    {copiedReferences ? (
+                      <span className="text-emerald-600 font-extrabold">✓ Copied References!</span>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Copy References
+                      </>
+                    )}
+                  </button>
+                )}
                 <button
                   onClick={handleDownloadDoc}
                   className="bg-black hover:bg-neutral-800 text-[#ffd200] font-extrabold text-xs uppercase tracking-wider py-2 px-3.5 rounded-sm transition flex items-center gap-1.5 shadow-xs"
@@ -1221,7 +1232,7 @@ function App() {
                       Original Citations Detected
                     </span>
                     <span className="text-xs text-neutral-700 font-medium">
-                      Your draft contains scholarly citations or references. Reconstructed while preserving your original citations without artificial APA injection.
+                      Your draft contains scholarly citations or references. Reconstructed while preserving your original citations with references isolated in their own section.
                     </span>
                   </div>
                 </div>
@@ -1237,7 +1248,7 @@ function App() {
                     </h3>
                   </div>
                   <span className="text-[11px] font-bold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-sm">
-                    Input Length: <strong className="text-black">{reconstructedData.wordCount} words</strong> • Citations: <strong className="text-black">{activeVariant?.citationCount ?? 0} {citationMode === 'without' && !reconstructedData.userProvidedCitations ? '(Clean Mode)' : 'APA sources'}</strong>
+                    Input Length: <strong className="text-black">{reconstructedData.wordCount} words</strong> • References: <strong className="text-black">{activeVariant?.references.length ?? 0} in separate section</strong>
                   </span>
                 </div>
 
@@ -1257,7 +1268,7 @@ function App() {
 
                 <div className="mt-4 pt-3 border-t border-neutral-200 flex items-center justify-between text-xs text-neutral-500 flex-wrap gap-2">
                   <span>
-                    <strong>Word Count Flexibility:</strong> Assessment specifies 4,000–5,000 words for the total coursework, but accepts modular question-by-question drafting ({reconstructedData.wordCount} words).
+                    <strong>References Layout:</strong> Reconstructed content and References are separated. References are isolated for pasting at the very end of your coursework document.
                   </span>
                   <span className="text-black font-extrabold">
                     Citation Density: {activeVariant?.citationDensity || reconstructedData.citationDensity}
@@ -1277,16 +1288,16 @@ function App() {
                   onClick={() => setReconstructedTab('references')}
                   className={`${reconstructedTab === 'references' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5`}
                 >
-                  References Section (APA 7th)
+                  APA 7th References (Separate Section)
                   <span className="bg-[#ffd200] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-sm">
-                    {activeVariant?.references.length ?? 0}
+                    {activeVariant?.references.length ?? 0} References
                   </span>
                 </button>
                 <button
                   onClick={() => setReconstructedTab('notes')}
                   className={`${reconstructedTab === 'notes' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5`}
                 >
-                  APA Citation Notes
+                  APA Sourcing & Literature Notes
                   <span className="bg-[#ffd200] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-sm">
                     {activeVariant?.citationNotes.length ?? 0} Notes
                   </span>
@@ -1299,76 +1310,116 @@ function App() {
                 </button>
               </div>
 
-              {/* TAB 1: RECONSTRUCTED MANUSCRIPT (PURE CONTENT ONLY) */}
+              {/* TAB 1: RECONSTRUCTED MANUSCRIPT (CONTENT ONLY - NO REFERENCES BUNDLED) */}
               {reconstructedTab === 'manuscript' && (
                 <div className="bg-white border border-neutral-200 rounded-sm shadow-sm p-8 sm:p-14 mb-10 max-w-4xl mx-auto">
+                  <div className="mb-6 pb-4 border-b border-neutral-200 flex items-center justify-between text-xs text-neutral-500 flex-wrap gap-2">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      Reconstructed manuscript content only. References are placed in the separate References section.
+                    </span>
+                    <button
+                      onClick={() => setReconstructedTab('references')}
+                      className="text-black font-extrabold hover:underline"
+                    >
+                      View References Section ({activeVariant?.references.length ?? 0}) →
+                    </button>
+                  </div>
                   <div dangerouslySetInnerHTML={{ __html: activeVariant?.manuscriptHtml || reconstructedData.reconstructedManuscriptHtml }} />
                 </div>
               )}
 
-              {/* TAB 2: SEPARATE REFERENCES SECTION (DISPLAY ONLY REFERENCES) */}
+              {/* TAB 2: SEPARATE REFERENCES SECTION (ONLY REFERENCES DISPLAYED HERE) */}
               {reconstructedTab === 'references' && (
-                <div className="max-w-4xl mx-auto space-y-6">
-                  {(!activeVariant?.references || activeVariant.references.length === 0) ? (
-                    <div className="bg-white border border-neutral-200 p-8 rounded-sm text-center space-y-3">
-                      <span className="inline-block bg-neutral-100 text-neutral-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm">
-                        {reconstructedData.userProvidedCitations ? 'User-Provided Citations Detected' : 'Without APA & References Mode Selected'}
-                      </span>
-                      <p className="text-sm text-neutral-600 max-w-lg mx-auto">
-                        {reconstructedData.userProvidedCitations
-                          ? 'Your original draft already contained citations or references. Synthetic APA references were not generated.'
-                          : 'You are currently viewing the "Without APA & References" option. Switch to "With APA & References" above to generate the APA 7th reference list.'}
-                      </p>
-                      {!reconstructedData.userProvidedCitations && (
+                <div className="space-y-6 max-w-4xl mx-auto">
+                  {/* References Card */}
+                  <div className="bg-white border-2 border-black rounded-sm p-6 sm:p-8 shadow-xs">
+                    <div className="flex items-center justify-between flex-wrap gap-3 border-b border-neutral-200 pb-4 mb-6">
+                      <div>
+                        <h3 className="text-lg font-black uppercase tracking-wide text-black flex items-center gap-2">
+                          References (APA 7th Edition)
+                          <span className="text-xs font-mono font-bold bg-[#ffd200] text-black px-2 py-0.5 rounded-sm">
+                            {activeVariant?.references.length ?? 0} Entries
+                          </span>
+                        </h3>
+                        <p className="text-xs text-neutral-500 mt-1">
+                          Separate section formatted for copying and appending to the very last page of your coursework document.
+                        </p>
+                      </div>
+
+                      {activeVariant && activeVariant.references.length > 0 && (
                         <button
-                          onClick={() => setCitationMode('with')}
-                          className="bg-[#ffd200] text-black text-xs font-black uppercase tracking-wider px-4 py-2 rounded-sm shadow-xs hover:bg-[#e6be00] transition inline-block mt-2"
+                          onClick={handleCopyReferences}
+                          className="bg-black hover:bg-neutral-800 text-[#ffd200] font-black text-xs uppercase tracking-wider py-2 px-3.5 rounded-sm transition flex items-center gap-1.5 shadow-xs"
                         >
-                          Switch to "With APA & References"
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="bg-white border-2 border-black rounded-sm shadow-sm p-8 sm:p-12 mb-10">
-                      <div className="flex items-center justify-between border-b border-neutral-200 pb-4 mb-6 flex-wrap gap-2">
-                        <div>
-                          <h2 className="text-base sm:text-lg font-black uppercase tracking-wider text-black flex items-center gap-2">
-                            <span>References</span>
-                            <span className="text-[10px] bg-black text-[#ffd200] px-2 py-0.5 rounded font-mono font-bold">
-                              APA 7th Edition
-                            </span>
-                          </h2>
-                          <p className="text-xs text-neutral-500 font-sans mt-0.5">
-                            Dedicated references section formatted with standard hanging indent
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            if (activeVariant?.referencesPlainText) {
-                              navigator.clipboard.writeText(activeVariant.referencesPlainText);
-                              setCopiedText(true);
-                              setTimeout(() => setCopiedText(false), 2000);
-                            }
-                          }}
-                          className="bg-white hover:bg-neutral-50 border border-neutral-300 hover:border-black text-black font-bold text-xs uppercase tracking-wider py-1.5 px-3 rounded-sm transition flex items-center gap-1.5 shadow-xs"
-                        >
-                          {copiedText ? (
-                            <span className="text-emerald-600 font-black">✓ Copied!</span>
+                          {copiedReferences ? (
+                            <span className="text-white font-black">✓ Copied References!</span>
                           ) : (
                             <>
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                              Copy References
+                              Copy References Only
                             </>
                           )}
                         </button>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* Display ONLY the references */}
-                      <div className="academic-references font-serif text-[15px] leading-[1.8] text-neutral-900 space-y-4">
+                    {(!activeVariant?.references || activeVariant.references.length === 0) ? (
+                      <div className="p-8 text-center bg-neutral-50 border border-neutral-200 rounded-sm">
+                        <p className="text-sm text-neutral-600 mb-3">
+                          {citationMode === 'without'
+                            ? 'You have selected "Without APA & References" mode. No references are included in this mode.'
+                            : 'No references available for this submission.'}
+                        </p>
+                        {!reconstructedData.userProvidedCitations && citationMode === 'without' && (
+                          <button
+                            onClick={() => setCitationMode('with')}
+                            className="bg-[#ffd200] text-black text-xs font-black uppercase tracking-wider px-4 py-2 rounded-sm shadow-xs hover:bg-[#e6be00] transition"
+                          >
+                            Switch to "With APA & References"
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="references-list font-serif text-[15px] leading-relaxed text-neutral-900 space-y-4">
                         {activeVariant.references.map((ref, idx) => (
-                          <p key={idx} className="pl-8 -indent-8 leading-relaxed font-serif text-justify text-neutral-900 border-b border-neutral-100 pb-3 last:border-b-0">
+                          <p key={idx} className="pl-8 -indent-8 text-justify leading-relaxed">
                             {ref}
                           </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Citation & Reference Advisory Notes: Explaining missed, found, and unmatched references */}
+                  {activeVariant?.advisoryNotes && activeVariant.advisoryNotes.length > 0 && (
+                    <div className="bg-white border border-neutral-200 rounded-sm p-6 shadow-xs space-y-4">
+                      <h4 className="text-xs font-black uppercase tracking-widest text-black flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#ffd200] border border-black"></span>
+                        Citation & Reference Advisory Notes
+                      </h4>
+                      <div className="space-y-3">
+                        {activeVariant.advisoryNotes.map((note, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3.5 rounded-sm border text-xs leading-relaxed ${
+                              note.type === 'found'
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                                : note.type === 'unmatched'
+                                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                : note.type === 'missing'
+                                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                                : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                            }`}
+                          >
+                            <div className="font-extrabold uppercase tracking-wider text-[11px] mb-1 flex items-center gap-1.5">
+                              {note.type === 'found' && <span>✓ {note.title}</span>}
+                              {note.type === 'unmatched' && <span>⚠ {note.title}</span>}
+                              {note.type === 'missing' && <span>! {note.title}</span>}
+                              {note.type === 'guideline' && <span>ℹ {note.title}</span>}
+                            </div>
+                            <p>{note.message}</p>
+                          </div>
                         ))}
                       </div>
                     </div>

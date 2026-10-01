@@ -3,10 +3,10 @@
 // - Times New Roman, 12pt, 1.5 line height, justified formatting
 // - Strict academic tone with high natural perplexity (anti-AI / anti-plagiarism)
 // - Research methodology justification (Qualitative & Quantitative)
-// - Reference list is kept completely separate from the content (never appended to manuscript)
-// - Dedicated References section displaying only the APA 7th reference entries
-// - APA citations & references only added when user input contains zero citations/references
-// - Dual options provided when zero citations submitted: "With APA & References" vs "Without APA & References"
+// - Separate section for references ONLY (references never bundled inside reconstructed content)
+// - Automatic identification of missing references when user omitted them
+// - Explicit citation and reference advisory notes for missing, found, or unmatched references
+// - Dual options provided when zero citations were submitted: "With APA & References" vs "Without APA & References"
 
 export type CitationNote = {
   citation: string;
@@ -22,12 +22,19 @@ export type ComplianceCheck = {
   detail: string;
 };
 
+export type ReferenceAdvisory = {
+  type: 'found' | 'missing' | 'unmatched' | 'guideline';
+  title: string;
+  message: string;
+};
+
 export interface ReconstructedVariant {
   manuscriptHtml: string;
   plainText: string;
   references: string[];
-  referencesHtml: string;
   referencesPlainText: string;
+  referencesHtml: string;
+  advisoryNotes: ReferenceAdvisory[];
   citationNotes: CitationNote[];
   citationCount: number;
   citationDensity: string;
@@ -45,8 +52,9 @@ export interface ReconstructedData {
   reconstructedManuscriptHtml: string;
   reconstructedPlainText: string;
   references: string[];
-  referencesHtml: string;
   referencesPlainText: string;
+  referencesHtml: string;
+  advisoryNotes: ReferenceAdvisory[];
   citationNotes: CitationNote[];
 }
 
@@ -196,15 +204,17 @@ export function calculateTargetCitations(wordCount: number): number {
   return Math.min(14, Math.floor(wordCount / 100));
 }
 
-// Builds the manuscript content ONLY (references are never appended here)
-function buildManuscriptHtml(sections: {
-  intro: string;
-  design: string;
-  collection: string;
-  analysis: string;
-  discussion: string;
-  conclusion: string;
-}): string {
+// Builds ONLY the reconstructed manuscript HTML (no references attached)
+function buildManuscriptHtml(
+  sections: {
+    intro: string;
+    design: string;
+    collection: string;
+    analysis: string;
+    discussion: string;
+    conclusion: string;
+  }
+): string {
   return `
     <div class="academic-manuscript font-serif text-[15px] leading-[1.8] text-neutral-900 text-justify space-y-5">
       <div class="text-center pb-6 border-b border-neutral-200 mb-6">
@@ -261,15 +271,17 @@ function buildManuscriptHtml(sections: {
   `;
 }
 
-// Builds the manuscript plain text ONLY (references are never appended here)
-function buildPlainText(sections: {
-  intro: string;
-  design: string;
-  collection: string;
-  analysis: string;
-  discussion: string;
-  conclusion: string;
-}): string {
+// Builds ONLY the reconstructed manuscript plain text (no references attached)
+function buildPlainText(
+  sections: {
+    intro: string;
+    design: string;
+    collection: string;
+    analysis: string;
+    discussion: string;
+    conclusion: string;
+  }
+): string {
   const parts = [
     `TITLE: METHODOLOGICAL INVESTIGATION INTO DIGITAL TRANSFORMATION AND ORGANIZATIONAL PERFORMANCE`,
     `ASSESSMENT MODULE: MSBA 7113 - RESEARCH METHODS`,
@@ -297,38 +309,26 @@ function buildPlainText(sections: {
   return parts.join('\n\n');
 }
 
-// Builds the dedicated, separate References section HTML displaying ONLY references
-function buildReferencesHtml(references: string[]): string {
-  if (!references || references.length === 0) return '';
+// Standalone HTML for the separate References section (APA 7th hanging indents)
+export function buildReferencesHtml(references: string[]): string {
+  if (!references || references.length === 0) {
+    return `<div class="p-6 text-center text-sm text-neutral-500 italic">No references generated or required for this mode.</div>`;
+  }
   return `
-    <div class="academic-references font-serif text-[15px] leading-[1.8] text-neutral-900 space-y-5">
-      <div class="text-center pb-5 border-b border-neutral-200 mb-6">
-        <h2 class="font-bold text-xl uppercase tracking-wider text-black font-sans mb-1">
-          References
-        </h2>
-        <p class="text-xs uppercase tracking-widest text-neutral-500 font-sans">
-          APA 7th Edition Guidelines • Hanging Indent (0.5 in) • Alphabetical Order
+    <div class="references-manuscript font-serif text-[15px] leading-relaxed text-neutral-900 space-y-4">
+      ${references.map(ref => `
+        <p class="pl-8 -indent-8 text-justify leading-relaxed">
+          ${ref}
         </p>
-      </div>
-      <div class="space-y-4">
-        ${references.map(ref => `
-          <p class="pl-8 -indent-8 leading-relaxed font-serif text-justify text-neutral-900 border-b border-neutral-100 pb-3 last:border-b-0">
-            ${ref}
-          </p>
-        `).join('')}
-      </div>
+      `).join('')}
     </div>
   `;
 }
 
-// Builds the dedicated References plain text displaying ONLY references
-function buildReferencesPlainText(references: string[]): string {
+// Standalone plain text for the separate References section
+export function buildReferencesPlainText(references: string[]): string {
   if (!references || references.length === 0) return '';
-  return [
-    `REFERENCES (APA 7th Edition)`,
-    ``,
-    ...references
-  ].join('\n\n');
+  return `REFERENCES (APA 7th Edition)\n\n` + references.join('\n\n');
 }
 
 export function reconstructAcademicContent(inputText: string): ReconstructedData {
@@ -343,7 +343,19 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
   const hasQuantitative = /quantitative|hypothes|survey|pls-sem|sem|regression|statistical|sample size|likert/i.test(lower);
   const hasProton = /proton/i.test(lower);
 
-  // Check if user already provided ANY citation or reference
+  // Extract user references and in-text citations from submitted draft
+  const refMatch = cleanInput.match(/(?:^|\n)\s*(?:references|reference list|bibliography|works cited|sources cited)\s*[:\n]+([\s\S]*)/i);
+  let userReferencesList: string[] = [];
+  if (refMatch && refMatch[1]) {
+    userReferencesList = refMatch[1]
+      .split(/\n+/)
+      .map(r => r.trim())
+      .filter(r => r.length > 15);
+  }
+
+  const userInTextCitations = Array.from(new Set(cleanInput.match(/\([A-Z][a-zA-Z\s&,.'-]+,\s*(?:19|20)\d{2}[a-z]?\)/g) || []));
+
+  // Determine if user provided ANY citation or reference
   const userHadAnyCitation = detectHasAnyCitationOrReference(cleanInput);
 
   // Assemble dynamic pool of citations tailored to topic
@@ -368,13 +380,14 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
   // Determine Subject Focus
   const domainSubject = hasProton ? "Proton Holdings Berhad" : "the Enterprise Under Investigation";
 
-  // Split input into meaningful thought blocks
-  const inputParagraphs = cleanInput
+  // Split input into meaningful thought blocks (ignoring references section in body)
+  const textWithoutRefs = cleanInput.replace(/(?:^|\n)\s*(?:references|reference list|bibliography|works cited)[\s\S]*/i, '').trim();
+  const inputParagraphs = textWithoutRefs
     .split(/\n\s*\n/)
     .map(p => p.trim())
     .filter(p => p.length > 20);
 
-  // --- SECTIONS WITH CITATIONS (IN-TEXT CITATIONS ONLY, NO REFERENCES IN CONTENT) ---
+  // --- SECTIONS WITH CITATIONS (Manuscript Content Only) ---
   const section1IntroWithCite = `In examining the structural dynamics of digital transformation within ${domainSubject}, scholarly inquiry necessitates a rigorous analytical paradigm that bridges theoretical conceptualization with empirical reality. Recent strategic literature emphasizes that organizational transformation represents far more than superficial technological deployment; rather, it entails a holistic restructuring of corporate architecture, employee competencies, and operational workflows ${selectedCitations[0]?.citation || '(Verhoef et al., 2021)'}. The primary objective of this investigation is to address the core assessment mandate by delineating an empirically defensible methodology capable of capturing authentic stakeholder dynamics and organizational performance shifts.`;
 
   const section2DesignWithCite = hasQualitative || !hasQuantitative
@@ -398,7 +411,7 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
 
   const section5ConclusionWithCite = `In conclusion, this reconstructed formulation satisfies the rigorous standards mandated by Assessment 1. By systematically articulating the research design, validating data acquisition protocols, and grounding empirical assertions in peer-reviewed scholarly literature, the analysis establishes an actionable roadmap for assessing digital transformation outcomes while adhering strictly to academic integrity and methodological transparency.`;
 
-  // --- SECTIONS WITHOUT CITATIONS (CLEAN SCHOLARLY PROSE) ---
+  // --- SECTIONS WITHOUT CITATIONS (Clean scholarly prose) ---
   const section1IntroClean = `In examining the structural dynamics of digital transformation within ${domainSubject}, scholarly inquiry necessitates a rigorous analytical paradigm that bridges theoretical conceptualization with empirical reality. Recent strategic literature emphasizes that organizational transformation represents far more than superficial technological deployment; rather, it entails a holistic restructuring of corporate architecture, employee competencies, and operational workflows. The primary objective of this investigation is to address the core assessment mandate by delineating an empirically defensible methodology capable of capturing authentic stakeholder dynamics and organizational performance shifts.`;
 
   const section2DesignClean = hasQualitative || !hasQuantitative
@@ -422,16 +435,6 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
   const section5ConclusionClean = `In conclusion, this reconstructed formulation satisfies the rigorous standards mandated by Assessment 1. By systematically articulating the research design, validating data acquisition protocols, and establishing analytical consistency across core investigative domains, the analysis establishes an actionable roadmap for assessing digital transformation outcomes while adhering strictly to academic integrity and methodological transparency.`;
 
   // --- PREPARE DATA STRUCTURES ---
-  const referencesList = selectedCitations.map(c => c.fullReference);
-  const citationNotes: CitationNote[] = selectedCitations.map(c => ({
-    citation: c.citation,
-    source: c.authorYear,
-    fullReference: c.fullReference,
-    supportedClaim: c.claim,
-    relevanceRationale: c.rationale
-  }));
-  const citationDensityStr = `${(selectedCitations.length / Math.max(1, wordCount) * 100).toFixed(1)} citations per 100 words`;
-
   const withSections = {
     intro: section1IntroWithCite,
     design: section2DesignWithCite,
@@ -450,40 +453,68 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
     conclusion: section5ConclusionClean,
   };
 
-  // With Citations: Content ONLY in manuscriptHtml / plainText; references in dedicated referencesHtml / referencesPlainText
-  const withVariant: ReconstructedVariant = {
-    manuscriptHtml: buildManuscriptHtml(withSections),
-    plainText: buildPlainText(withSections),
-    references: referencesList,
-    referencesHtml: buildReferencesHtml(referencesList),
-    referencesPlainText: buildReferencesPlainText(referencesList),
-    citationNotes,
-    citationCount: selectedCitations.length,
-    citationDensity: citationDensityStr,
-  };
-
-  const withoutVariant: ReconstructedVariant = {
-    manuscriptHtml: buildManuscriptHtml(cleanSections),
-    plainText: buildPlainText(cleanSections),
-    references: [],
-    referencesHtml: '',
-    referencesPlainText: '',
-    citationNotes: [],
-    citationCount: 0,
-    citationDensity: "0 citations (Clean Scholarly Text)",
-  };
-
-  // If the user already provided ANY citation or reference, do NOT inject synthetic APA citations
+  // CASE 1: User already provided ANY citation or reference in their submission
   if (userHadAnyCitation) {
+    const html = buildManuscriptHtml(cleanSections);
+    const text = buildPlainText(cleanSections);
+
+    const resolvedReferences = [...userReferencesList];
+    const userAdvisoryNotes: ReferenceAdvisory[] = [];
+
+    // If user provided in-text citations, check if any were missing from their references list
+    if (userInTextCitations.length > 0) {
+      userInTextCitations.forEach(cite => {
+        const citeClean = cite.replace(/[()]/g, '');
+        const authorMatch = citeClean.match(/^[A-Za-z\s&.'-]+/);
+        const authorName = authorMatch ? authorMatch[0].trim().toLowerCase() : '';
+        const alreadyInRefs = resolvedReferences.some(r => r.toLowerCase().includes(authorName));
+
+        if (!alreadyInRefs) {
+          // Look up citation in scholarly database to find matching reference
+          const foundInDb = citationPool.find(c => c.citation.toLowerCase().includes(authorName) || c.authorYear.toLowerCase().includes(authorName));
+          if (foundInDb) {
+            resolvedReferences.push(foundInDb.fullReference);
+            userAdvisoryNotes.push({
+              type: 'found',
+              title: `Reference Identified for In-Text Citation ${cite}`,
+              message: `In-text citation "${cite}" was identified in your draft without a matching References entry. Full APA 7th reference was retrieved and provided in this separate section.`
+            });
+          } else {
+            // Note that APA reference could not be automatically found
+            userAdvisoryNotes.push({
+              type: 'unmatched',
+              title: `Unmatched Citation: ${cite}`,
+              message: `In-text citation "${cite}" was detected in your draft, but full bibliographic details (authors, title, publisher/journal, DOI) could not be located in your submission. Note: Please supply the full APA 7th reference for this entry at the end of your document.`
+            });
+          }
+        }
+      });
+    }
+
+    if (resolvedReferences.length > 0) {
+      userAdvisoryNotes.unshift({
+        type: 'guideline',
+        title: 'Document References Separated',
+        message: 'Your document references are isolated in this section for easy copying to the end of your coursework document.'
+      });
+    } else {
+      userAdvisoryNotes.push({
+        type: 'missing',
+        title: 'Missing Reference List in Draft',
+        message: 'Your submission included citation markers, but no References section was found. Please ensure full references are appended to the last page of your coursework.'
+      });
+    }
+
     const preservedVariant: ReconstructedVariant = {
-      manuscriptHtml: buildManuscriptHtml(cleanSections),
-      plainText: buildPlainText(cleanSections),
-      references: [],
-      referencesHtml: '',
-      referencesPlainText: '',
+      manuscriptHtml: html,
+      plainText: text,
+      references: resolvedReferences,
+      referencesPlainText: buildReferencesPlainText(resolvedReferences),
+      referencesHtml: buildReferencesHtml(resolvedReferences),
+      advisoryNotes: userAdvisoryNotes,
       citationNotes: [],
-      citationCount: 0,
-      citationDensity: "Original Citations Preserved",
+      citationCount: resolvedReferences.length,
+      citationDensity: `${resolvedReferences.length} References in Separate Section`,
     };
 
     const complianceChecks: ComplianceCheck[] = [
@@ -493,9 +524,9 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
         detail: "Formulated in formal academic English with zero colloquialisms or generic AI transition markers."
       },
       {
-        criterion: "APA Citations & References Handling",
+        criterion: "APA References Separation",
         status: "Compliant",
-        detail: "User-provided citations detected in submission. Preserved original scholarly references without synthetic injection."
+        detail: "Reconstructed manuscript content is completely separated from the References section, ready for appending at the document end."
       },
       {
         criterion: "Methodological Intelligence Rigor",
@@ -528,18 +559,71 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
       withCitations: preservedVariant,
       withoutCitations: preservedVariant,
       injectedCitationsCount: 0,
-      citationDensity: "0 Injected (Original Citations Preserved)",
+      citationDensity: `${resolvedReferences.length} References in Separate Section`,
       complianceChecks,
       reconstructedManuscriptHtml: preservedVariant.manuscriptHtml,
       reconstructedPlainText: preservedVariant.plainText,
-      references: [],
-      referencesHtml: '',
-      referencesPlainText: '',
+      references: resolvedReferences,
+      referencesPlainText: preservedVariant.referencesPlainText,
+      referencesHtml: preservedVariant.referencesHtml,
+      advisoryNotes: userAdvisoryNotes,
       citationNotes: []
     };
   }
 
-  // If user did NOT provide any citation or reference, provide both options
+  // CASE 2: User did NOT provide any citations or references (missed adding references)
+  // Find peer-reviewed references matching methodology and provide them in the separate section
+  const referencesList = selectedCitations.map(c => c.fullReference);
+  const citationNotes: CitationNote[] = selectedCitations.map(c => ({
+    citation: c.citation,
+    source: c.authorYear,
+    fullReference: c.fullReference,
+    supportedClaim: c.claim,
+    relevanceRationale: c.rationale
+  }));
+  const citationDensityStr = `${(selectedCitations.length / Math.max(1, wordCount) * 100).toFixed(1)} citations per 100 words`;
+
+  const withVariant: ReconstructedVariant = {
+    manuscriptHtml: buildManuscriptHtml(withSections),
+    plainText: buildPlainText(withSections),
+    references: referencesList,
+    referencesPlainText: buildReferencesPlainText(referencesList),
+    referencesHtml: buildReferencesHtml(referencesList),
+    advisoryNotes: [
+      {
+        type: 'found',
+        title: 'Missing References Identified & Provided',
+        message: `Your submitted draft did not include any APA references. ${selectedCitations.length} high-impact peer-reviewed references matching your research methodology (${hasQuantitative ? 'Quantitative / PLS-SEM' : 'Qualitative / Thematic'}) have been identified and provided in this separate section so you can paste them at the end of your document.`
+      },
+      {
+        type: 'guideline',
+        title: 'Assessment 1 APA 7th Referencing Guideline',
+        message: 'Assessment 1 Specific Instruction 7 mandates that all claims be supported by literature using APA 7th Edition format. Ensure these references are added at the end of your final submission.'
+      }
+    ],
+    citationNotes,
+    citationCount: selectedCitations.length,
+    citationDensity: citationDensityStr,
+  };
+
+  const withoutVariant: ReconstructedVariant = {
+    manuscriptHtml: buildManuscriptHtml(cleanSections),
+    plainText: buildPlainText(cleanSections),
+    references: [],
+    referencesPlainText: '',
+    referencesHtml: buildReferencesHtml([]),
+    advisoryNotes: [
+      {
+        type: 'guideline',
+        title: 'Without APA & References Mode Selected',
+        message: 'You have selected the clean text version without literature citations or references. If your assessment requires reference accreditation, switch to "With APA & References" above.'
+      }
+    ],
+    citationNotes: [],
+    citationCount: 0,
+    citationDensity: "0 citations (Clean Scholarly Text)",
+  };
+
   const complianceChecks: ComplianceCheck[] = [
     {
       criterion: "Language & Academic Tone",
@@ -547,9 +631,9 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
       detail: "Formulated in formal academic English with zero colloquialisms or generic AI transition markers."
     },
     {
-      criterion: "APA 7th Edition Citations & References",
+      criterion: "Separate References Section",
       status: "Compliant",
-      detail: `Zero user citations detected. Prepared ${selectedCitations.length} high-impact APA citations scaled to ${wordCount} words with references in a separate dedicated section.`
+      detail: `Reconstructed content and References are cleanly isolated. ${selectedCitations.length} peer-reviewed references provided in a dedicated section ready to append at the end of your document.`
     },
     {
       criterion: "Methodological Intelligence Rigor",
@@ -587,8 +671,9 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
     reconstructedManuscriptHtml: withVariant.manuscriptHtml,
     reconstructedPlainText: withVariant.plainText,
     references: referencesList,
-    referencesHtml: withVariant.referencesHtml,
     referencesPlainText: withVariant.referencesPlainText,
+    referencesHtml: withVariant.referencesHtml,
+    advisoryNotes: withVariant.advisoryNotes,
     citationNotes
   };
 }
