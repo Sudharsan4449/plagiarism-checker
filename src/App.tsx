@@ -113,7 +113,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<'matches' | 'citations' | 'methodology' | 'context' | 'ai' | 'grammar'>('matches');
   const [errorMsg, setErrorMsg] = useState('');
   const [showReconstruction, setShowReconstruction] = useState(false);
-  const [reconstructedTab, setReconstructedTab] = useState<'manuscript' | 'references' | 'methodology' | 'notes' | 'compare'>('manuscript');
+  const [reconstructedTab, setReconstructedTab] = useState<'manuscript' | 'no-methodology' | 'compare' | 'references' | 'methodology' | 'notes'>('manuscript');
+  const [compareVersion, setCompareVersion] = useState<'without-methodology' | 'all-corrected'>('without-methodology');
   const [citationMode, setCitationMode] = useState<'with' | 'without'>('with');
   const [copiedText, setCopiedText] = useState(false);
   const [copiedReferences, setCopiedReferences] = useState(false);
@@ -404,7 +405,12 @@ function App() {
   };
 
   const handleCopyReconstructed = () => {
-    const textToCopy = activeVariant ? activeVariant.plainText : reconstructedData?.reconstructedPlainText;
+    let textToCopy = '';
+    if (reconstructedTab === 'no-methodology') {
+      textToCopy = activeVariant ? activeVariant.withoutMethodologyPlainText : (reconstructedData?.withoutMethodologyPlainText || '');
+    } else {
+      textToCopy = activeVariant ? activeVariant.plainText : (reconstructedData?.reconstructedPlainText || '');
+    }
     if (!textToCopy) return;
     navigator.clipboard.writeText(textToCopy);
     setCopiedText(true);
@@ -1287,7 +1293,22 @@ function App() {
                   onClick={() => setReconstructedTab('manuscript')}
                   className={`${reconstructedTab === 'manuscript' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition whitespace-nowrap`}
                 >
-                  Reconstructed Academic Manuscript
+                  All-Corrected Academic Manuscript
+                </button>
+                <button
+                  onClick={() => setReconstructedTab('no-methodology')}
+                  className={`${reconstructedTab === 'no-methodology' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5 whitespace-nowrap`}
+                >
+                  Reconstructed (Without Methodological Corrections)
+                  <span className="bg-black text-[#ffd200] text-[9px] font-extrabold px-1.5 py-0.5 rounded-sm">
+                    Pure Content
+                  </span>
+                </button>
+                <button
+                  onClick={() => setReconstructedTab('compare')}
+                  className={`${reconstructedTab === 'compare' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition whitespace-nowrap`}
+                >
+                  Original Input vs Reconstructed Comparison
                 </button>
                 <button
                   onClick={() => setReconstructedTab('references')}
@@ -1297,12 +1318,6 @@ function App() {
                   <span className="bg-[#ffd200] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-sm">
                     {activeVariant?.references.length ?? 0} References
                   </span>
-                </button>
-                <button
-                  onClick={() => setReconstructedTab('compare')}
-                  className={`${reconstructedTab === 'compare' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition whitespace-nowrap`}
-                >
-                  Original Input vs Reconstructed Comparison
                 </button>
                 <button
                   onClick={() => setReconstructedTab('methodology')}
@@ -1321,13 +1336,13 @@ function App() {
                 </button>
               </div>
 
-              {/* TAB 1: RECONSTRUCTED MANUSCRIPT (CONTENT ONLY - NO REFERENCES BUNDLED) */}
+              {/* TAB 1: ALL-CORRECTED RECONSTRUCTED MANUSCRIPT (WITH METHODOLOGY CORRECTIONS) */}
               {reconstructedTab === 'manuscript' && (
                 <div className="bg-white border border-neutral-200 rounded-sm shadow-sm p-8 sm:p-14 mb-10 max-w-4xl mx-auto">
                   <div className="mb-6 pb-4 border-b border-neutral-200 flex items-center justify-between text-xs text-neutral-500 flex-wrap gap-2">
                     <span className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      Reconstructed manuscript content only. References are placed in the separate References section.
+                      All-Corrected Academic Manuscript (includes Assessment 1 research design & analytical framework). References are separated in their own section.
                     </span>
                     <button
                       onClick={() => setReconstructedTab('references')}
@@ -1337,6 +1352,33 @@ function App() {
                     </button>
                   </div>
                   <div dangerouslySetInnerHTML={{ __html: activeVariant?.manuscriptHtml || reconstructedData.reconstructedManuscriptHtml }} />
+                </div>
+              )}
+
+              {/* TAB 2: RECONSTRUCTED (WITHOUT METHODOLOGICAL CORRECTIONS - PURE SUBMITTED CONTENT) */}
+              {reconstructedTab === 'no-methodology' && (
+                <div className="bg-white border border-neutral-200 rounded-sm shadow-sm p-8 sm:p-14 mb-10 max-w-4xl mx-auto">
+                  <div className="mb-6 pb-4 border-b border-neutral-200 flex items-center justify-between text-xs text-neutral-500 flex-wrap gap-2">
+                    <span className="flex items-center gap-1.5 font-bold text-neutral-800">
+                      <span className="w-2 h-2 rounded-full bg-[#ffd200] border border-black"></span>
+                      Faithful academic reconstruction of your submitted questions & arguments (zero synthetic research design, sampling, or PLS-SEM added).
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleCopyReconstructed}
+                        className="bg-black hover:bg-neutral-800 text-[#ffd200] font-black text-xs uppercase tracking-wider py-1.5 px-3 rounded-sm transition flex items-center gap-1 shadow-xs"
+                      >
+                        {copiedText ? '✓ Copied!' : 'Copy This Version'}
+                      </button>
+                      <button
+                        onClick={() => setReconstructedTab('references')}
+                        className="text-black font-extrabold hover:underline"
+                      >
+                        View References Section ({activeVariant?.references.length ?? 0}) →
+                      </button>
+                    </div>
+                  </div>
+                  <div dangerouslySetInnerHTML={{ __html: activeVariant?.withoutMethodologyHtml || reconstructedData.withoutMethodologyHtml }} />
                 </div>
               )}
 
@@ -1536,16 +1578,44 @@ function App() {
 
                     {/* Right: Reconstructed Academic Paper */}
                     <div className="bg-white border-2 border-black rounded-sm p-6 shadow-xs">
-                      <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
-                        <span className="text-xs font-black uppercase tracking-widest text-black">
-                          Reconstructed Scholarly Text {citationMode === 'without' && !reconstructedData.userProvidedCitations ? '(Clean / No Citations)' : '(APA 7th + Times New Roman 1.5)'}
-                        </span>
-                        <span className="text-[10px] bg-[#ffd200] text-black px-2 py-0.5 rounded font-mono font-black">
-                          Assessment Compliant
-                        </span>
+                      <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4 flex-wrap gap-2">
+                        <div>
+                          <span className="text-xs font-black uppercase tracking-widest text-black block">
+                            {compareVersion === 'without-methodology'
+                              ? 'Reconstructed (Without Methodological Additions)'
+                              : 'All-Corrected Academic Manuscript'}
+                          </span>
+                          <span className="text-[10px] text-neutral-500">
+                            {citationMode === 'without' && !reconstructedData.userProvidedCitations ? 'Clean Scholarly Text' : 'APA 7th + Times New Roman 1.5'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded border border-neutral-300">
+                          <button
+                            onClick={() => setCompareVersion('without-methodology')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition uppercase tracking-wider ${
+                              compareVersion === 'without-methodology'
+                                ? 'bg-black text-[#ffd200] font-black shadow-2xs'
+                                : 'text-neutral-600 hover:text-black'
+                            }`}
+                          >
+                            No Methodology
+                          </button>
+                          <button
+                            onClick={() => setCompareVersion('all-corrected')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition uppercase tracking-wider ${
+                              compareVersion === 'all-corrected'
+                                ? 'bg-black text-[#ffd200] font-black shadow-2xs'
+                                : 'text-neutral-600 hover:text-black'
+                            }`}
+                          >
+                            All-Corrected
+                          </button>
+                        </div>
                       </div>
                       <div className="text-sm font-serif leading-[1.8] text-justify text-neutral-900 max-h-[600px] overflow-y-auto pr-2 whitespace-pre-wrap">
-                        {activeVariant?.plainText || reconstructedData.reconstructedPlainText}
+                        {compareVersion === 'without-methodology'
+                          ? (activeVariant?.withoutMethodologyPlainText || reconstructedData.withoutMethodologyPlainText)
+                          : (activeVariant?.plainText || reconstructedData.reconstructedPlainText)}
                       </div>
                     </div>
                   </div>
