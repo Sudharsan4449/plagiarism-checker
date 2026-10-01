@@ -91,12 +91,21 @@ type Result = {
   wordCount?: number;
 };
 
+const DEDUCTION_STEPS = [
+  { id: 1, label: "First Deduction", title: "Linguistic Parsing & Syntactic N-Grams", detail: "Tokenizing clauses, analyzing sentence variance, and extracting n-gram phrases" },
+  { id: 2, label: "Second Deduction", title: "Web Index & Wikipedia Archive Plagiarism Scan", detail: "Querying global web archives and Wikipedia repositories for exact phrase matches" },
+  { id: 3, label: "Third Deduction", title: "Multi-Model AI Syntactic Consensus", detail: "Evaluating neural burstiness, token predictability, and LLM generative patterns" },
+  { id: 4, label: "Fourth Deduction", title: "Scholarly Literature & APA 7th Citation Audit", detail: "Auditing parenthetical & narrative citations, reference lists, and author indices" },
+  { id: 5, label: "Fifth Deduction", title: "Research Methodology Intelligence & Final Consensus", detail: "Classifying qualitative/quantitative designs, hypotheses, and compiling consensus" }
+];
+
 function App() {
   const [text, setText] = useState('');
   const apiKey = import.meta.env.VITE_EDEN_API_KEY || ''; // Use Vercel env var directly
   
   const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [isChecking, setIsChecking] = useState(false);
+  const [deductionStep, setDeductionStep] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [activeTab, setActiveTab] = useState<'matches' | 'citations' | 'methodology' | 'context' | 'ai' | 'grammar'>('matches');
@@ -281,6 +290,15 @@ function App() {
     setIsChecking(true);
     setResult(null);
     setErrorMsg('');
+    setDeductionStep(0);
+
+    let currentStep = 0;
+    const stepInterval = setInterval(() => {
+      currentStep++;
+      if (currentStep < DEDUCTION_STEPS.length) {
+        setDeductionStep(currentStep);
+      }
+    }, 800);
 
     try {
       // Call the Vercel serverless backend
@@ -301,15 +319,31 @@ function App() {
       if (!isMsba && (activeTab === 'citations' || activeTab === 'methodology')) {
         setActiveTab('matches');
       }
+
+      clearInterval(stepInterval);
+
+      // Fast-forward any remaining steps so the user sees each horizontal cut happen!
+      for (let s = currentStep; s <= DEDUCTION_STEPS.length; s++) {
+        setDeductionStep(s);
+        await new Promise((r) => setTimeout(r, 220));
+      }
+
+      await new Promise((r) => setTimeout(r, 350));
       setResult(data);
     } catch (err) {
+      clearInterval(stepInterval);
       console.warn("Backend unavailable, using client fallback:", err);
       try {
+        for (let s = currentStep; s <= DEDUCTION_STEPS.length; s++) {
+          setDeductionStep(s);
+          await new Promise((r) => setTimeout(r, 200));
+        }
         await handleFallbackCheck();
       } catch (fallbackErr) {
         setErrorMsg("Failed to run check. Please try again.");
       }
     } finally {
+      clearInterval(stepInterval);
       setIsChecking(false);
     }
   };
@@ -410,15 +444,12 @@ function App() {
             <button
               onClick={handleCheck}
               disabled={isChecking || !text.trim()}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isChecking ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Querying Multiple APIs...
+                  <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping"></span>
+                  Processing {DEDUCTION_STEPS[Math.min(deductionStep, DEDUCTION_STEPS.length - 1)].label}...
                 </>
               ) : (
                 'Run Consensus Check'
@@ -426,6 +457,147 @@ function App() {
             </button>
           </div>
         </main>
+
+        {isChecking && (
+          <section className="bg-white rounded-2xl shadow-lg border border-blue-100 p-6 sm:p-8 mt-6 mb-8 animate-fade-in-up">
+            <div className="flex items-center justify-between pb-5 border-b border-gray-100 mb-6 flex-wrap gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200">
+                  <svg className="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
+                    Multi-Engine Deduction Pipeline
+                    <span className="text-xs bg-blue-100 text-blue-800 font-semibold px-2.5 py-0.5 rounded-full">
+                      Live
+                    </span>
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Executing analytical checks sequentially across web indices and AI models
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200">
+                  {deductionStep >= DEDUCTION_STEPS.length ? "Finalizing Report" : `Stage ${deductionStep + 1} of ${DEDUCTION_STEPS.length}`}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {DEDUCTION_STEPS.map((step, idx) => {
+                const isCompleted = idx < deductionStep;
+                const isActive = idx === deductionStep;
+
+                return (
+                  <div
+                    key={step.id}
+                    className={`flex items-start gap-4 p-4 rounded-xl transition-all duration-500 ${
+                      isActive
+                        ? 'bg-blue-50/90 border-2 border-blue-300 shadow-sm scale-[1.01]'
+                        : isCompleted
+                        ? 'bg-gray-50/70 border border-gray-100 opacity-40'
+                        : 'border border-gray-100 opacity-45 bg-white'
+                    }`}
+                  >
+                    {/* Step Indicator Icon */}
+                    <div className="flex-shrink-0 mt-0.5">
+                      {isCompleted ? (
+                        <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black shadow-sm transition-all duration-500">
+                          ✓
+                        </div>
+                      ) : isActive ? (
+                        <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200 transition-all duration-500">
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        </div>
+                      ) : (
+                        <div className="w-7 h-7 rounded-full border-2 border-gray-200 text-gray-400 flex items-center justify-center text-xs font-bold">
+                          {step.id}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step Text with Horizontal Cut and Fade when Completed */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded transition-all duration-500 ${
+                              isCompleted
+                                ? 'bg-gray-200 text-gray-500 line-through decoration-gray-400'
+                                : isActive
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                          <span
+                            className={`text-sm sm:text-base font-bold transition-all duration-500 ${
+                              isCompleted
+                                ? 'line-through decoration-2 decoration-gray-400 text-gray-500'
+                                : isActive
+                                ? 'text-blue-950 font-black'
+                                : 'text-gray-500'
+                            }`}
+                          >
+                            {step.title}
+                          </span>
+                        </div>
+
+                        {isCompleted && (
+                          <span className="text-xs font-bold text-emerald-600 whitespace-nowrap flex items-center gap-1">
+                            Completed
+                          </span>
+                        )}
+                        {isActive && (
+                          <span className="text-xs font-extrabold text-blue-600 whitespace-nowrap flex items-center gap-1.5 animate-pulse">
+                            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                            In Progress...
+                          </span>
+                        )}
+                      </div>
+
+                      <p
+                        className={`text-xs mt-1 transition-all duration-500 leading-relaxed ${
+                          isCompleted
+                            ? 'line-through decoration-gray-300 text-gray-400'
+                            : isActive
+                            ? 'text-blue-900 font-medium'
+                            : 'text-gray-400'
+                        }`}
+                      >
+                        {step.detail}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom Progress Tracker */}
+            <div className="mt-6 pt-5 border-t border-gray-100 flex items-center gap-4">
+              <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: `${Math.min(100, Math.round(((deductionStep) / DEDUCTION_STEPS.length) * 100))}%`
+                  }}
+                ></div>
+              </div>
+              <span className="text-xs font-extrabold text-blue-700 whitespace-nowrap min-w-[3rem] text-right">
+                {Math.min(100, Math.round(((deductionStep) / DEDUCTION_STEPS.length) * 100))}%
+              </span>
+            </div>
+          </section>
+        )}
 
         {result && (
           <section className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden animate-fade-in-up">
