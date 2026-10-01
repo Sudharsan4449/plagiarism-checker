@@ -71,31 +71,6 @@ async function searchWebAndWiki(phrase) {
     console.error('DuckDuckGo search error:', err.message);
   }
 
-  // 3. Search Crossref Academic & Research Literature Index
-  try {
-    const crossrefUrl = `https://api.crossref.org/works?query.bibliographic=${query}&rows=2`;
-    const res = await fetch(crossrefUrl, {
-      headers: { 'User-Agent': 'VeriCheckAcademic/2.0 (mailto:scholar-check@example.com)' }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const items = data.message?.items || [];
-      for (const item of items) {
-        const title = item.title?.[0];
-        if (title && item.URL) {
-          matches.push({
-            source: `Academic Paper: ${title}`,
-            url: item.URL,
-            snippet: `Indexed in CrossRef scholarly literature database`,
-            matchedPhrase: phrase
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Crossref search error:', err.message);
-  }
-
   return matches;
 }
 
