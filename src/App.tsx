@@ -1,4 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import * as mammoth from 'mammoth';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker to use CDN to avoid Vite build complexities
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 type Match = {
   source: string;
@@ -17,12 +22,53 @@ type Result = {
 
 function App() {
   const [text, setText] = useState('');
-  const [apiKey, setApiKey] = useState(import.meta.env.VITE_EDEN_API_KEY || '');
-  const [showSettings, setShowSettings] = useState(false);
+  const apiKey = import.meta.env.VITE_EDEN_API_KEY || ''; // Use Vercel env var directly
+  
   const [isChecking, setIsChecking] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [activeTab, setActiveTab] = useState<'matches' | 'grammar' | 'ai'>('matches');
   const [errorMsg, setErrorMsg] = useState('');
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setErrorMsg('');
+    try {
+      if (file.name.endsWith('.txt')) {
+        const text = await file.text();
+        setText(text);
+      } else if (file.name.endsWith('.docx')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        setText(result.value);
+      } else if (file.name.endsWith('.pdf')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let extractedText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(' ');
+          extractedText += pageText + '\n';
+        }
+        setText(extractedText);
+      } else {
+        setErrorMsg("Unsupported file format. Please upload .txt, .docx, or .pdf");
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Failed to read the file. It might be corrupted or protected.");
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const checkGrammar = async (textToCheck: string) => {
     try {
@@ -45,8 +91,7 @@ function App() {
   const handleCheck = async () => {
     if (!text.trim()) return;
     if (!apiKey.trim()) {
-      setErrorMsg("Please enter your Eden AI API key in the settings first.");
-      setShowSettings(true);
+      setErrorMsg("API Key is missing. Please add VITE_EDEN_API_KEY in Vercel settings.");
       return;
     }
 
@@ -66,7 +111,7 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          providers: "originalityai", // Using originality.ai through Eden
+          providers: "originalityai",
           text: text,
         }),
       });
@@ -77,10 +122,8 @@ function App() {
         aiProb = Math.round(aiData.originalityai.ai_score * 100);
       }
 
-      // 3. Mocking Plagiarism (Eden AI's plagiarism endpoint requires specific premium providers, 
-      // so we use a fallback mock if the API call fails or for demonstration)
-      // In a full production app, you would call: https://api.edenai.run/v2/text/plagiarism
-      const mockScore = Math.floor(Math.random() * 30); // Random score 0-30%
+      // 3. Mock Plagiarism (Until real endpoint is unlocked)
+      const mockScore = Math.floor(Math.random() * 30); 
       
       setResult({
         score: mockScore,
@@ -119,35 +162,11 @@ function App() {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setShowSettings(!showSettings)}
-              className="text-gray-500 hover:text-gray-900 transition flex items-center gap-2 text-sm font-medium"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-              API Settings
-            </button>
             <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
               Live API Mode
             </span>
           </div>
         </header>
-
-        {showSettings && (
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-8 border border-blue-100 animate-fade-in-up">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">API Configuration</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              To use real detection, get a free API key from <a href="https://edenai.co/" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Eden AI</a>. 
-              (Grammar checking uses LanguageTool and is completely free).
-            </p>
-            <input 
-              type="password"
-              placeholder="Paste your Eden AI Bearer Token here..."
-              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-          </div>
-        )}
 
         {errorMsg && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-8" role="alert">
@@ -169,11 +188,34 @@ function App() {
               id="content"
               rows={8}
               className="w-full border border-gray-200 bg-gray-50 rounded-lg p-4 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800 shadow-inner"
-              placeholder="Paste your text here to run real AI and Grammar checks..."
+              placeholder="Paste your text here or upload a document to run real AI and Grammar checks..."
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
             <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center gap-4">
+                <input 
+                  type="file" 
+                  accept=".txt,.pdf,.docx" 
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  className="hidden" 
+                  id="file-upload" 
+                />
+                <label 
+                  htmlFor="file-upload"
+                  className="cursor-pointer text-sm text-gray-600 hover:text-blue-600 font-medium flex items-center gap-1 transition"
+                >
+                  {isUploading ? (
+                    <span className="animate-pulse">Extracting text...</span>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                      Upload File (.txt, .pdf, .docx)
+                    </>
+                  )}
+                </label>
+              </div>
               <div className="text-sm font-medium text-gray-500">
                 {text.trim().split(/\s+/).filter((w) => w.length > 0).length} words
               </div>
