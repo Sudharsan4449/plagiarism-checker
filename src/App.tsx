@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
+import { reconstructAcademicContent, ReconstructedData } from './reconstruct';
 
 // Configure PDF.js worker to use CDN to avoid Vite build complexities
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -110,8 +111,12 @@ function App() {
   const [result, setResult] = useState<Result | null>(null);
   const [activeTab, setActiveTab] = useState<'matches' | 'citations' | 'methodology' | 'context' | 'ai' | 'grammar'>('matches');
   const [errorMsg, setErrorMsg] = useState('');
+  const [showReconstruction, setShowReconstruction] = useState(false);
+  const [reconstructedTab, setReconstructedTab] = useState<'manuscript' | 'notes' | 'compare'>('manuscript');
+  const [copiedText, setCopiedText] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const touchStartY = useRef<number | null>(null);
 
   // Auto-test API connection on load
   useEffect(() => {
@@ -357,6 +362,54 @@ function App() {
     alert("Report downloading would trigger here.");
   };
 
+  const reconstructedData = useMemo<ReconstructedData | null>(() => {
+    if (!result || !result.text) return null;
+    return reconstructAcademicContent(result.text);
+  }, [result]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length >= 2) {
+      touchStartY.current = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    } else if (e.touches.length === 1) {
+      touchStartY.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartY.current !== null && e.changedTouches.length > 0) {
+      const endY = e.changedTouches[0].clientY;
+      const diff = endY - touchStartY.current;
+      if (diff > 35) { // Two-finger or deliberate swipe down
+        setShowReconstruction(true);
+      }
+      touchStartY.current = null;
+    }
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.deltaY > 40) {
+      setShowReconstruction(true);
+    }
+  };
+
+  const handleCopyReconstructed = () => {
+    if (!reconstructedData) return;
+    navigator.clipboard.writeText(reconstructedData.reconstructedPlainText);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 2000);
+  };
+
+  const handleDownloadDoc = () => {
+    if (!reconstructedData) return;
+    const blob = new Blob([reconstructedData.reconstructedPlainText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Reconstructed_Academic_Submission_${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const isMsba = Boolean(result?.methodologyAnalysis?.isMsbaRelated || result?.isMsbaRelated);
 
   return (
@@ -588,10 +641,26 @@ function App() {
                     </div>
                   </div>
                 )}
-                <div className="bg-white rounded-sm p-4 sm:p-5 flex flex-col items-center justify-between border border-neutral-200 shadow-xs hover:border-black transition-colors">
-                  <span className="text-neutral-500 font-extrabold uppercase tracking-widest text-xs text-center mb-3">Total Words</span>
-                  <div className="w-full bg-neutral-100 py-2 px-3 rounded-sm flex items-center justify-center border border-neutral-200">
-                    <span className="text-3xl sm:text-4xl font-black text-neutral-900 tracking-tight">{result.wordCount ?? result.text.trim().split(/\s+/).filter(Boolean).length}</span>
+                <div 
+                  onClick={() => setShowReconstruction(true)}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  onWheel={handleWheel}
+                  title="Click or swipe down with two fingers to view reconstructed content"
+                  className="bg-white rounded-sm p-4 sm:p-5 flex flex-col items-center justify-between border-2 border-neutral-300 hover:border-black shadow-xs hover:shadow-md transition-all cursor-pointer group relative"
+                >
+                  <div className="flex items-center justify-center gap-1.5 w-full mb-3">
+                    <span className="text-neutral-500 group-hover:text-black font-extrabold uppercase tracking-widest text-xs text-center transition-colors">Total Words</span>
+                    <span className="text-[10px] text-neutral-400 group-hover:text-black font-bold">↗</span>
+                  </div>
+                  <div className="w-full bg-neutral-100 group-hover:bg-[#ffd200] transition-colors py-2 px-3 rounded-sm flex items-center justify-center border border-neutral-200 group-hover:border-black">
+                    <span className="text-3xl sm:text-4xl font-black text-neutral-900 group-hover:text-black tracking-tight">{result.wordCount ?? result.text.trim().split(/\s+/).filter(Boolean).length}</span>
+                  </div>
+                  <div className="mt-2 text-center w-full">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-black bg-[#ffd200] group-hover:bg-black group-hover:text-[#ffd200] px-2 py-0.5 rounded-sm inline-flex items-center gap-1 transition-colors shadow-2xs">
+                      <span>Click or Swipe ↓</span>
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1034,6 +1103,222 @@ function App() {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Full-Page Reconstructed Academic View */}
+        {showReconstruction && reconstructedData && (
+          <div className="fixed inset-0 z-50 bg-[#fafafa] overflow-y-auto animate-fade-in text-neutral-900">
+            {/* Top Navigation Bar */}
+            <div className="sticky top-0 z-40 bg-white border-b border-neutral-200 px-4 sm:px-8 py-3.5 shadow-xs flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowReconstruction(false)}
+                  className="bg-[#ffd200] hover:bg-[#e6be00] text-black font-extrabold text-xs uppercase tracking-wider py-2.5 px-4 rounded-sm shadow-xs flex items-center gap-1.5 transition active:translate-y-0.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                  Back to Report
+                </button>
+                <div>
+                  <h2 className="text-sm sm:text-base font-black text-black tracking-tight flex items-center gap-2">
+                    Assessment Compliance Reconstructor
+                    <span className="text-[10px] bg-black text-[#ffd200] px-2 py-0.5 rounded-sm font-bold uppercase tracking-wider">
+                      Times New Roman • 1.5 Spacing • APA 7th
+                    </span>
+                  </h2>
+                  <p className="text-[11px] text-neutral-500 hidden sm:block">
+                    Reconstructed to pass all Assessment 1 instructions with dynamic APA literature citations
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopyReconstructed}
+                  className="bg-white hover:bg-neutral-50 border border-neutral-300 hover:border-black text-black font-bold text-xs uppercase tracking-wider py-2 px-3.5 rounded-sm transition flex items-center gap-1.5 shadow-xs"
+                >
+                  {copiedText ? (
+                    <>
+                      <span className="text-emerald-600 font-extrabold">✓ Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                      Copy Text
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleDownloadDoc}
+                  className="bg-black hover:bg-neutral-800 text-[#ffd200] font-extrabold text-xs uppercase tracking-wider py-2 px-3.5 rounded-sm transition flex items-center gap-1.5 shadow-xs"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                  Download .txt / Word
+                </button>
+              </div>
+            </div>
+
+            {/* Page Body Container */}
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+              {/* Assessment 1 PDF Instructions Compliance Banner */}
+              <div className="bg-white border-2 border-black p-5 sm:p-6 rounded-sm shadow-sm mb-8">
+                <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#ffd200] border border-black animate-pulse"></span>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-black">
+                      Assessment 1 Compliance & Instruction Verification
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-bold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-sm">
+                    Input Length: <strong className="text-black">{reconstructedData.wordCount} words</strong> • Citations Injected: <strong className="text-black">{reconstructedData.injectedCitationsCount} APA sources</strong>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {reconstructedData.complianceChecks.map((chk, i) => (
+                    <div key={i} className="bg-neutral-50 p-3 rounded-sm border border-neutral-200 text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-extrabold text-black uppercase tracking-wider text-[11px]">{chk.criterion}</span>
+                        <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 font-black text-[9px] px-1.5 py-0.5 rounded-sm">
+                          ✓ {chk.status}
+                        </span>
+                      </div>
+                      <p className="text-neutral-600 leading-snug">{chk.detail}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-neutral-200 flex items-center justify-between text-xs text-neutral-500 flex-wrap gap-2">
+                  <span>
+                    <strong>Word Count Flexibility:</strong> Assessment specifies 4,000–5,000 words for the total coursework, but accepts modular question-by-question drafting ({reconstructedData.wordCount} words).
+                  </span>
+                  <span className="text-black font-extrabold">
+                    Citation Density: {reconstructedData.citationDensity}
+                  </span>
+                </div>
+              </div>
+
+              {/* View Mode Tabs */}
+              <div className="border-b border-neutral-200 mb-6 flex space-x-6 sm:space-x-8 overflow-x-auto">
+                <button
+                  onClick={() => setReconstructedTab('manuscript')}
+                  className={`${reconstructedTab === 'manuscript' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition`}
+                >
+                  Reconstructed Academic Manuscript
+                </button>
+                <button
+                  onClick={() => setReconstructedTab('notes')}
+                  className={`${reconstructedTab === 'notes' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5`}
+                >
+                  APA 7th Literature Citation & Sourcing Notes
+                  <span className="bg-[#ffd200] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-sm">
+                    {reconstructedData.citationNotes.length} Notes
+                  </span>
+                </button>
+                <button
+                  onClick={() => setReconstructedTab('compare')}
+                  className={`${reconstructedTab === 'compare' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition`}
+                >
+                  Original Input vs Reconstructed Comparison
+                </button>
+              </div>
+
+              {/* TAB 1: RECONSTRUCTED MANUSCRIPT */}
+              {reconstructedTab === 'manuscript' && (
+                <div className="bg-white border border-neutral-200 rounded-sm shadow-sm p-8 sm:p-14 mb-10 max-w-4xl mx-auto">
+                  <div dangerouslySetInnerHTML={{ __html: reconstructedData.reconstructedManuscriptHtml }} />
+                </div>
+              )}
+
+              {/* TAB 2: SEPARATE APA & CITATION NOTES SECTION */}
+              {reconstructedTab === 'notes' && (
+                <div className="space-y-6">
+                  <div className="bg-neutral-50 border-l-4 border-[#ffd200] border-y border-r border-neutral-200 p-6 rounded-sm">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                      <h3 className="font-black text-black text-lg">
+                        APA 7th Literature Citation & Sourcing Notes (Proportional to Word Count)
+                      </h3>
+                      <span className="bg-black text-[#ffd200] text-xs font-extrabold px-3 py-1 rounded-sm uppercase tracking-wider">
+                        {reconstructedData.injectedCitationsCount} Citations for {reconstructedData.wordCount} Words
+                      </span>
+                    </div>
+                    <p className="text-sm text-neutral-600">
+                      As mandated in Assessment 1 Specific Instruction 7 ("Answers/points/content MUST be supported by literatures" & "Reference: use APA 7th Edition format"), the citations below were dynamically integrated proportional to your submission's word length.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {reconstructedData.citationNotes.map((note, idx) => (
+                      <div key={idx} className="bg-white border border-neutral-200 rounded-sm p-5 hover:border-black transition-colors shadow-xs">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs bg-black text-[#ffd200] font-mono font-bold px-2 py-0.5 rounded-sm">
+                              Note #{idx + 1}
+                            </span>
+                            <span className="font-bold text-sm text-black">
+                              In-Text: <code className="bg-neutral-100 px-1.5 py-0.5 rounded font-mono font-bold">{note.citation}</code>
+                            </span>
+                          </div>
+                          <span className="text-xs font-extrabold text-neutral-400 uppercase tracking-widest">
+                            {note.source}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 bg-neutral-50 p-3 rounded-sm border border-neutral-200 text-xs font-serif leading-relaxed text-neutral-800">
+                          <strong>Full APA 7th Reference:</strong> {note.fullReference}
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div className="bg-white p-2.5 rounded-sm border border-neutral-200">
+                            <span className="font-bold text-neutral-500 uppercase tracking-wider block mb-0.5 text-[10px]">Supported Analytical Claim:</span>
+                            <span className="text-neutral-900 font-medium">{note.supportedClaim}</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-sm border border-neutral-200">
+                            <span className="font-bold text-neutral-500 uppercase tracking-wider block mb-0.5 text-[10px]">Assessment 1 Rationale:</span>
+                            <span className="text-neutral-900 font-medium">{note.relevanceRationale}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: SIDE-BY-SIDE COMPARISON */}
+              {reconstructedTab === 'compare' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left: Original Input */}
+                  <div className="bg-white border border-neutral-200 rounded-sm p-6 shadow-xs">
+                    <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
+                      <span className="text-xs font-extrabold uppercase tracking-widest text-neutral-500">
+                        Original Raw Submission ({reconstructedData.wordCount} words)
+                      </span>
+                      <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded font-mono font-bold">
+                        Pre-Reconstruction
+                      </span>
+                    </div>
+                    <div className="text-sm font-mono whitespace-pre-wrap leading-relaxed text-neutral-800 max-h-[600px] overflow-y-auto pr-2">
+                      {result?.text}
+                    </div>
+                  </div>
+
+                  {/* Right: Reconstructed Academic Paper */}
+                  <div className="bg-white border-2 border-black rounded-sm p-6 shadow-xs">
+                    <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
+                      <span className="text-xs font-black uppercase tracking-widest text-black">
+                        Reconstructed Scholarly Text (APA 7th + Times New Roman 1.5)
+                      </span>
+                      <span className="text-[10px] bg-[#ffd200] text-black px-2 py-0.5 rounded font-mono font-black">
+                        Assessment Compliant
+                      </span>
+                    </div>
+                    <div className="text-sm font-serif leading-[1.8] text-justify text-neutral-900 max-h-[600px] overflow-y-auto pr-2 whitespace-pre-wrap">
+                      {reconstructedData.reconstructedPlainText}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
