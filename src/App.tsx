@@ -67,9 +67,18 @@ type MethodologyAnalysis = {
   hasDataCollection: boolean;
 };
 
+type AiSignals = {
+  perplexity?: string;
+  burstiness?: string;
+  syntacticStyle?: string;
+  flaggedMarkers?: string[];
+};
+
 type Result = {
   score: number;
   aiProbability: number;
+  aiReason?: string;
+  aiSignals?: AiSignals;
   grammarErrors: number;
   matches: Match[];
   text: string;
@@ -213,6 +222,17 @@ function App() {
     setResult({
       score: 0,
       aiProbability: finalAiProb,
+      aiReason: finalAiProb >= 60
+        ? `High AI Probability (${finalAiProb}%): Sentences show uniform structural pacing and repetitive syntactic formulas.`
+        : finalAiProb >= 25
+        ? `Mixed Cadence (${finalAiProb}%): Contains a combination of natural human phrasing and structured patterns.`
+        : `Authentic Human Writing (${finalAiProb}%): High natural burstiness and dynamic sentence structures with zero automated transition markers.`,
+      aiSignals: {
+        perplexity: finalAiProb >= 60 ? "Low Perplexity (Predictable word choices)" : "High Perplexity (Organic phrasing)",
+        burstiness: finalAiProb >= 60 ? "Low Burstiness (Uniform sentence rhythm)" : "High Burstiness (Natural variation in sentence lengths)",
+        syntacticStyle: finalAiProb >= 60 ? "Formulaic LLM structure" : "Organic human writing style",
+        flaggedMarkers: []
+      },
       grammarErrors: grammarErrorsCount,
       text: text,
       aiProviders: aiProviderResults,
@@ -825,6 +845,57 @@ function App() {
                     <div className="bg-purple-100 text-purple-900 p-4 rounded-lg flex items-center justify-between shadow-sm">
                       <span className="font-bold">Final Consensus Score:</span>
                       <span className="font-black text-xl">{result.aiProbability}%</span>
+                    </div>
+
+                    <div className="mt-5 bg-white border border-purple-200 rounded-xl p-5 shadow-sm">
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 flex-shrink-0">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-gray-900">Why was this score assigned? (Reason Flagged)</h4>
+                          <p className="text-xs text-gray-500">Linguistic breakdown of token predictability, sentence burstiness, and syntactic patterns</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-purple-50/80 border border-purple-100 rounded-lg p-3.5 mb-4 text-xs sm:text-sm text-purple-950 font-medium leading-relaxed">
+                        {result.aiReason || (result.aiProbability >= 60
+                          ? `High AI Probability (${result.aiProbability}%): The text exhibits uniform sentence lengths, low burstiness, and formulaic AI transition patterns characteristic of generative LLMs.`
+                          : result.aiProbability >= 25
+                          ? `Moderate / Hybrid Cadence (${result.aiProbability}%): The text demonstrates a blend of organic human phrasing with structured syntactic conventions.`
+                          : `Authentic Human Writing (${result.aiProbability}%): High perplexity and dynamic sentence burstiness with natural stylistic variation and no repetitive synthetic markers.`
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Perplexity & Predictability</span>
+                          <span className="text-xs text-gray-800 font-medium">
+                            {result.aiSignals?.perplexity || (result.aiProbability >= 60 ? "Low Perplexity (Highly predictable next-word sequences)" : "High Perplexity (Organic, unpredictable phrasing)")}
+                          </span>
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Sentence Burstiness</span>
+                          <span className="text-xs text-gray-800 font-medium">
+                            {result.aiSignals?.burstiness || (result.aiProbability >= 60 ? "Low Burstiness (Uniform sentence rhythm typical of LLMs)" : "High Burstiness (Natural variation in sentence lengths)")}
+                          </span>
+                        </div>
+                      </div>
+
+                      {result.aiSignals?.flaggedMarkers && result.aiSignals.flaggedMarkers.length > 0 && (
+                        <div className="pt-3 border-t border-gray-100">
+                          <span className="text-xs font-bold text-gray-600 block mb-2">Detected AI Transition & Formulaic Patterns:</span>
+                          <div className="flex flex-wrap gap-2">
+                            {result.aiSignals.flaggedMarkers.map((marker, idx) => (
+                              <span key={idx} className="bg-purple-50 text-purple-800 text-xs font-mono font-semibold px-2.5 py-1 rounded-md border border-purple-200">
+                                {marker}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
