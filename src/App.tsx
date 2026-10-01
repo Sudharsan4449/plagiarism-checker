@@ -113,7 +113,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'matches' | 'citations' | 'methodology' | 'context' | 'ai' | 'grammar'>('matches');
   const [errorMsg, setErrorMsg] = useState('');
   const [showReconstruction, setShowReconstruction] = useState(false);
-  const [reconstructedTab, setReconstructedTab] = useState<'manuscript' | 'notes' | 'compare'>('manuscript');
+  const [reconstructedTab, setReconstructedTab] = useState<'manuscript' | 'references' | 'notes' | 'compare'>('manuscript');
   const [citationMode, setCitationMode] = useState<'with' | 'without'>('with');
   const [copiedText, setCopiedText] = useState(false);
   
@@ -403,7 +403,12 @@ function App() {
   };
 
   const handleCopyReconstructed = () => {
-    const textToCopy = activeVariant ? activeVariant.plainText : reconstructedData?.reconstructedPlainText;
+    let textToCopy = '';
+    if (reconstructedTab === 'references') {
+      textToCopy = activeVariant?.referencesPlainText || '';
+    } else {
+      textToCopy = activeVariant ? activeVariant.plainText : (reconstructedData?.reconstructedPlainText || '');
+    }
     if (!textToCopy) return;
     navigator.clipboard.writeText(textToCopy);
     setCopiedText(true);
@@ -411,13 +416,21 @@ function App() {
   };
 
   const handleDownloadDoc = () => {
-    const textToDownload = activeVariant ? activeVariant.plainText : reconstructedData?.reconstructedPlainText;
+    let textToDownload = '';
+    let fileName = '';
+    if (reconstructedTab === 'references') {
+      textToDownload = activeVariant?.referencesPlainText || '';
+      fileName = `References_APA7th_${Date.now()}.txt`;
+    } else {
+      textToDownload = activeVariant ? activeVariant.plainText : (reconstructedData?.reconstructedPlainText || '');
+      fileName = `Reconstructed_Academic_Submission_${citationMode === 'without' && !reconstructedData?.userProvidedCitations ? 'Clean' : 'APA'}_${Date.now()}.txt`;
+    }
     if (!textToDownload) return;
     const blob = new Blob([textToDownload], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Reconstructed_Academic_Submission_${citationMode === 'without' && !reconstructedData?.userProvidedCitations ? 'Clean' : 'APA'}_${Date.now()}.txt`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1261,10 +1274,19 @@ function App() {
                   Reconstructed Academic Manuscript
                 </button>
                 <button
+                  onClick={() => setReconstructedTab('references')}
+                  className={`${reconstructedTab === 'references' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5`}
+                >
+                  References Section (APA 7th)
+                  <span className="bg-[#ffd200] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-sm">
+                    {activeVariant?.references.length ?? 0}
+                  </span>
+                </button>
+                <button
                   onClick={() => setReconstructedTab('notes')}
                   className={`${reconstructedTab === 'notes' ? 'border-b-2 border-[#ffd200] text-black font-black' : 'border-transparent text-neutral-400 hover:text-black font-bold'} uppercase tracking-wider text-xs py-3 px-1 transition flex items-center gap-1.5`}
                 >
-                  APA 7th Literature Citation & Sourcing Notes
+                  APA Citation Notes
                   <span className="bg-[#ffd200] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-sm">
                     {activeVariant?.citationNotes.length ?? 0} Notes
                   </span>
@@ -1277,14 +1299,84 @@ function App() {
                 </button>
               </div>
 
-              {/* TAB 1: RECONSTRUCTED MANUSCRIPT */}
+              {/* TAB 1: RECONSTRUCTED MANUSCRIPT (PURE CONTENT ONLY) */}
               {reconstructedTab === 'manuscript' && (
                 <div className="bg-white border border-neutral-200 rounded-sm shadow-sm p-8 sm:p-14 mb-10 max-w-4xl mx-auto">
                   <div dangerouslySetInnerHTML={{ __html: activeVariant?.manuscriptHtml || reconstructedData.reconstructedManuscriptHtml }} />
                 </div>
               )}
 
-              {/* TAB 2: SEPARATE APA & CITATION NOTES SECTION */}
+              {/* TAB 2: SEPARATE REFERENCES SECTION (DISPLAY ONLY REFERENCES) */}
+              {reconstructedTab === 'references' && (
+                <div className="max-w-4xl mx-auto space-y-6">
+                  {(!activeVariant?.references || activeVariant.references.length === 0) ? (
+                    <div className="bg-white border border-neutral-200 p-8 rounded-sm text-center space-y-3">
+                      <span className="inline-block bg-neutral-100 text-neutral-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm">
+                        {reconstructedData.userProvidedCitations ? 'User-Provided Citations Detected' : 'Without APA & References Mode Selected'}
+                      </span>
+                      <p className="text-sm text-neutral-600 max-w-lg mx-auto">
+                        {reconstructedData.userProvidedCitations
+                          ? 'Your original draft already contained citations or references. Synthetic APA references were not generated.'
+                          : 'You are currently viewing the "Without APA & References" option. Switch to "With APA & References" above to generate the APA 7th reference list.'}
+                      </p>
+                      {!reconstructedData.userProvidedCitations && (
+                        <button
+                          onClick={() => setCitationMode('with')}
+                          className="bg-[#ffd200] text-black text-xs font-black uppercase tracking-wider px-4 py-2 rounded-sm shadow-xs hover:bg-[#e6be00] transition inline-block mt-2"
+                        >
+                          Switch to "With APA & References"
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-white border-2 border-black rounded-sm shadow-sm p-8 sm:p-12 mb-10">
+                      <div className="flex items-center justify-between border-b border-neutral-200 pb-4 mb-6 flex-wrap gap-2">
+                        <div>
+                          <h2 className="text-base sm:text-lg font-black uppercase tracking-wider text-black flex items-center gap-2">
+                            <span>References</span>
+                            <span className="text-[10px] bg-black text-[#ffd200] px-2 py-0.5 rounded font-mono font-bold">
+                              APA 7th Edition
+                            </span>
+                          </h2>
+                          <p className="text-xs text-neutral-500 font-sans mt-0.5">
+                            Dedicated references section formatted with standard hanging indent
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (activeVariant?.referencesPlainText) {
+                              navigator.clipboard.writeText(activeVariant.referencesPlainText);
+                              setCopiedText(true);
+                              setTimeout(() => setCopiedText(false), 2000);
+                            }
+                          }}
+                          className="bg-white hover:bg-neutral-50 border border-neutral-300 hover:border-black text-black font-bold text-xs uppercase tracking-wider py-1.5 px-3 rounded-sm transition flex items-center gap-1.5 shadow-xs"
+                        >
+                          {copiedText ? (
+                            <span className="text-emerald-600 font-black">✓ Copied!</span>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                              Copy References
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Display ONLY the references */}
+                      <div className="academic-references font-serif text-[15px] leading-[1.8] text-neutral-900 space-y-4">
+                        {activeVariant.references.map((ref, idx) => (
+                          <p key={idx} className="pl-8 -indent-8 leading-relaxed font-serif text-justify text-neutral-900 border-b border-neutral-100 pb-3 last:border-b-0">
+                            {ref}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: SEPARATE APA & CITATION NOTES SECTION */}
               {reconstructedTab === 'notes' && (
                 <div className="space-y-6">
                   {(!activeVariant?.citationNotes || activeVariant.citationNotes.length === 0) ? (
@@ -1361,7 +1453,7 @@ function App() {
                 </div>
               )}
 
-              {/* TAB 3: SIDE-BY-SIDE COMPARISON */}
+              {/* TAB 4: SIDE-BY-SIDE COMPARISON */}
               {reconstructedTab === 'compare' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left: Original Input */}

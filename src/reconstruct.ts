@@ -3,9 +3,10 @@
 // - Times New Roman, 12pt, 1.5 line height, justified formatting
 // - Strict academic tone with high natural perplexity (anti-AI / anti-plagiarism)
 // - Research methodology justification (Qualitative & Quantitative)
-// - APA 7th Edition in-text citations & references added ONLY when user has not mentioned a single citation/reference
-// - Dual options provided when no citations were submitted: "With APA & References" vs "Without APA & References"
-// - Separate APA Citation & Compliance Notes section
+// - Reference list is kept completely separate from the content (never appended to manuscript)
+// - Dedicated References section displaying only the APA 7th reference entries
+// - APA citations & references only added when user input contains zero citations/references
+// - Dual options provided when zero citations submitted: "With APA & References" vs "Without APA & References"
 
 export type CitationNote = {
   citation: string;
@@ -25,6 +26,8 @@ export interface ReconstructedVariant {
   manuscriptHtml: string;
   plainText: string;
   references: string[];
+  referencesHtml: string;
+  referencesPlainText: string;
   citationNotes: CitationNote[];
   citationCount: number;
   citationDensity: string;
@@ -42,6 +45,8 @@ export interface ReconstructedData {
   reconstructedManuscriptHtml: string;
   reconstructedPlainText: string;
   references: string[];
+  referencesHtml: string;
+  referencesPlainText: string;
   citationNotes: CitationNote[];
 }
 
@@ -191,34 +196,15 @@ export function calculateTargetCitations(wordCount: number): number {
   return Math.min(14, Math.floor(wordCount / 100));
 }
 
-function buildManuscriptHtml(
-  sections: {
-    intro: string;
-    design: string;
-    collection: string;
-    analysis: string;
-    discussion: string;
-    conclusion: string;
-  },
-  references?: string[]
-): string {
-  const referencesHtml = (references && references.length > 0)
-    ? `
-      <div class="pt-8 mt-8 border-t border-neutral-300">
-        <h2 class="font-bold text-lg text-black text-center mb-4 uppercase tracking-wider font-sans">
-          References
-        </h2>
-        <div class="space-y-3 text-xs sm:text-sm text-neutral-800">
-          ${references.map(ref => `
-            <p class="pl-8 -indent-8 leading-relaxed font-serif">
-              ${ref}
-            </p>
-          `).join('')}
-        </div>
-      </div>
-    `
-    : '';
-
+// Builds the manuscript content ONLY (references are never appended here)
+function buildManuscriptHtml(sections: {
+  intro: string;
+  design: string;
+  collection: string;
+  analysis: string;
+  discussion: string;
+  conclusion: string;
+}): string {
   return `
     <div class="academic-manuscript font-serif text-[15px] leading-[1.8] text-neutral-900 text-justify space-y-5">
       <div class="text-center pb-6 border-b border-neutral-200 mb-6">
@@ -271,23 +257,19 @@ function buildManuscriptHtml(
         </h2>
         <p class="indent-8">${sections.conclusion}</p>
       </div>
-
-      ${referencesHtml}
     </div>
   `;
 }
 
-function buildPlainText(
-  sections: {
-    intro: string;
-    design: string;
-    collection: string;
-    analysis: string;
-    discussion: string;
-    conclusion: string;
-  },
-  references?: string[]
-): string {
+// Builds the manuscript plain text ONLY (references are never appended here)
+function buildPlainText(sections: {
+  intro: string;
+  design: string;
+  collection: string;
+  analysis: string;
+  discussion: string;
+  conclusion: string;
+}): string {
   const parts = [
     `TITLE: METHODOLOGICAL INVESTIGATION INTO DIGITAL TRANSFORMATION AND ORGANIZATIONAL PERFORMANCE`,
     `ASSESSMENT MODULE: MSBA 7113 - RESEARCH METHODS`,
@@ -312,11 +294,41 @@ function buildPlainText(
     sections.conclusion
   ];
 
-  if (references && references.length > 0) {
-    parts.push(``, `REFERENCES (APA 7th Edition)`, ...references);
-  }
-
   return parts.join('\n\n');
+}
+
+// Builds the dedicated, separate References section HTML displaying ONLY references
+function buildReferencesHtml(references: string[]): string {
+  if (!references || references.length === 0) return '';
+  return `
+    <div class="academic-references font-serif text-[15px] leading-[1.8] text-neutral-900 space-y-5">
+      <div class="text-center pb-5 border-b border-neutral-200 mb-6">
+        <h2 class="font-bold text-xl uppercase tracking-wider text-black font-sans mb-1">
+          References
+        </h2>
+        <p class="text-xs uppercase tracking-widest text-neutral-500 font-sans">
+          APA 7th Edition Guidelines • Hanging Indent (0.5 in) • Alphabetical Order
+        </p>
+      </div>
+      <div class="space-y-4">
+        ${references.map(ref => `
+          <p class="pl-8 -indent-8 leading-relaxed font-serif text-justify text-neutral-900 border-b border-neutral-100 pb-3 last:border-b-0">
+            ${ref}
+          </p>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// Builds the dedicated References plain text displaying ONLY references
+function buildReferencesPlainText(references: string[]): string {
+  if (!references || references.length === 0) return '';
+  return [
+    `REFERENCES (APA 7th Edition)`,
+    ``,
+    ...references
+  ].join('\n\n');
 }
 
 export function reconstructAcademicContent(inputText: string): ReconstructedData {
@@ -362,7 +374,7 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
     .map(p => p.trim())
     .filter(p => p.length > 20);
 
-  // --- SECTIONS WITH CITATIONS ---
+  // --- SECTIONS WITH CITATIONS (IN-TEXT CITATIONS ONLY, NO REFERENCES IN CONTENT) ---
   const section1IntroWithCite = `In examining the structural dynamics of digital transformation within ${domainSubject}, scholarly inquiry necessitates a rigorous analytical paradigm that bridges theoretical conceptualization with empirical reality. Recent strategic literature emphasizes that organizational transformation represents far more than superficial technological deployment; rather, it entails a holistic restructuring of corporate architecture, employee competencies, and operational workflows ${selectedCitations[0]?.citation || '(Verhoef et al., 2021)'}. The primary objective of this investigation is to address the core assessment mandate by delineating an empirically defensible methodology capable of capturing authentic stakeholder dynamics and organizational performance shifts.`;
 
   const section2DesignWithCite = hasQualitative || !hasQuantitative
@@ -386,7 +398,7 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
 
   const section5ConclusionWithCite = `In conclusion, this reconstructed formulation satisfies the rigorous standards mandated by Assessment 1. By systematically articulating the research design, validating data acquisition protocols, and grounding empirical assertions in peer-reviewed scholarly literature, the analysis establishes an actionable roadmap for assessing digital transformation outcomes while adhering strictly to academic integrity and methodological transparency.`;
 
-  // --- SECTIONS WITHOUT CITATIONS (Clean scholarly prose) ---
+  // --- SECTIONS WITHOUT CITATIONS (CLEAN SCHOLARLY PROSE) ---
   const section1IntroClean = `In examining the structural dynamics of digital transformation within ${domainSubject}, scholarly inquiry necessitates a rigorous analytical paradigm that bridges theoretical conceptualization with empirical reality. Recent strategic literature emphasizes that organizational transformation represents far more than superficial technological deployment; rather, it entails a holistic restructuring of corporate architecture, employee competencies, and operational workflows. The primary objective of this investigation is to address the core assessment mandate by delineating an empirically defensible methodology capable of capturing authentic stakeholder dynamics and organizational performance shifts.`;
 
   const section2DesignClean = hasQualitative || !hasQuantitative
@@ -438,10 +450,13 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
     conclusion: section5ConclusionClean,
   };
 
+  // With Citations: Content ONLY in manuscriptHtml / plainText; references in dedicated referencesHtml / referencesPlainText
   const withVariant: ReconstructedVariant = {
-    manuscriptHtml: buildManuscriptHtml(withSections, referencesList),
-    plainText: buildPlainText(withSections, referencesList),
+    manuscriptHtml: buildManuscriptHtml(withSections),
+    plainText: buildPlainText(withSections),
     references: referencesList,
+    referencesHtml: buildReferencesHtml(referencesList),
+    referencesPlainText: buildReferencesPlainText(referencesList),
     citationNotes,
     citationCount: selectedCitations.length,
     citationDensity: citationDensityStr,
@@ -451,6 +466,8 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
     manuscriptHtml: buildManuscriptHtml(cleanSections),
     plainText: buildPlainText(cleanSections),
     references: [],
+    referencesHtml: '',
+    referencesPlainText: '',
     citationNotes: [],
     citationCount: 0,
     citationDensity: "0 citations (Clean Scholarly Text)",
@@ -462,6 +479,8 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
       manuscriptHtml: buildManuscriptHtml(cleanSections),
       plainText: buildPlainText(cleanSections),
       references: [],
+      referencesHtml: '',
+      referencesPlainText: '',
       citationNotes: [],
       citationCount: 0,
       citationDensity: "Original Citations Preserved",
@@ -514,6 +533,8 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
       reconstructedManuscriptHtml: preservedVariant.manuscriptHtml,
       reconstructedPlainText: preservedVariant.plainText,
       references: [],
+      referencesHtml: '',
+      referencesPlainText: '',
       citationNotes: []
     };
   }
@@ -528,7 +549,7 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
     {
       criterion: "APA 7th Edition Citations & References",
       status: "Compliant",
-      detail: `Zero user citations detected. Prepared ${selectedCitations.length} high-impact APA citations scaled to ${wordCount} words with two toggleable options.`
+      detail: `Zero user citations detected. Prepared ${selectedCitations.length} high-impact APA citations scaled to ${wordCount} words with references in a separate dedicated section.`
     },
     {
       criterion: "Methodological Intelligence Rigor",
@@ -566,6 +587,8 @@ export function reconstructAcademicContent(inputText: string): ReconstructedData
     reconstructedManuscriptHtml: withVariant.manuscriptHtml,
     reconstructedPlainText: withVariant.plainText,
     references: referencesList,
+    referencesHtml: withVariant.referencesHtml,
+    referencesPlainText: withVariant.referencesPlainText,
     citationNotes
   };
 }
