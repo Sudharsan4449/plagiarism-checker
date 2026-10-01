@@ -371,8 +371,8 @@ function App() {
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length >= 2) {
       touchStartY.current = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    } else if (e.touches.length === 1) {
-      touchStartY.current = e.touches[0].clientY;
+    } else {
+      touchStartY.current = null;
     }
   };
 
@@ -380,7 +380,7 @@ function App() {
     if (touchStartY.current !== null && e.changedTouches.length > 0) {
       const endY = e.changedTouches[0].clientY;
       const diff = endY - touchStartY.current;
-      if (diff > 35) { // Two-finger or deliberate swipe down
+      if (diff > 35) { // Two-finger swipe down
         setShowReconstruction(true);
       }
       touchStartY.current = null;
@@ -643,25 +643,15 @@ function App() {
                   </div>
                 )}
                 <div 
-                  onClick={() => setShowReconstruction(true)}
+                  onDoubleClick={() => setShowReconstruction(true)}
                   onTouchStart={handleTouchStart}
                   onTouchEnd={handleTouchEnd}
                   onWheel={handleWheel}
-                  title="Click or swipe down with two fingers to view reconstructed content"
-                  className="bg-white rounded-sm p-4 sm:p-5 flex flex-col items-center justify-between border-2 border-neutral-300 hover:border-black shadow-xs hover:shadow-md transition-all cursor-pointer group relative"
+                  className="bg-white rounded-sm p-4 sm:p-5 flex flex-col items-center justify-between border border-neutral-200 shadow-xs hover:border-black transition-colors select-none"
                 >
-                  <div className="flex items-center justify-center gap-1.5 w-full mb-3">
-                    <span className="text-neutral-500 group-hover:text-black font-extrabold uppercase tracking-widest text-xs text-center transition-colors">Total Words</span>
-                    <span className="text-[10px] text-neutral-400 group-hover:text-black font-bold">↗</span>
-                  </div>
-                  <div className="w-full bg-neutral-100 group-hover:bg-[#ffd200] transition-colors py-2 px-3 rounded-sm flex items-center justify-center border border-neutral-200 group-hover:border-black">
-                    <span className="text-3xl sm:text-4xl font-black text-neutral-900 group-hover:text-black tracking-tight">{result.wordCount ?? result.text.trim().split(/\s+/).filter(Boolean).length}</span>
-                  </div>
-                  <div className="mt-2 text-center w-full">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-black bg-[#ffd200] group-hover:bg-black group-hover:text-[#ffd200] px-2 py-0.5 rounded-sm inline-flex items-center gap-1 transition-colors shadow-2xs">
-                      <span>Click or Swipe ↓</span>
-                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
-                    </span>
+                  <span className="text-neutral-500 font-extrabold uppercase tracking-widest text-xs text-center mb-3">Total Words</span>
+                  <div className="w-full bg-neutral-100 py-2 px-3 rounded-sm flex items-center justify-center border border-neutral-200">
+                    <span className="text-3xl sm:text-4xl font-black text-neutral-900 tracking-tight">{result.wordCount ?? result.text.trim().split(/\s+/).filter(Boolean).length}</span>
                   </div>
                 </div>
               </div>
