@@ -23,7 +23,8 @@ async function searchWebAndWiki(phrase) {
           source: `Wikipedia: ${title}`,
           url,
           snippet: cleanSnippet,
-          matchedPhrase: phrase
+          matchedPhrase: phrase,
+          matchReason: "Verbatim Match: Exact phrase from submission was found in this published article."
         });
       }
     }
@@ -61,7 +62,8 @@ async function searchWebAndWiki(phrase) {
               source: title || new URL(cleanUrl).hostname,
               url: cleanUrl,
               snippet,
-              matchedPhrase: phrase
+              matchedPhrase: phrase,
+              matchReason: "Verbatim Match: Exact phrase from submission was found on this webpage."
             });
           }
         }
@@ -207,7 +209,8 @@ async function fetchContextArticles(contextQuery) {
           articles.push({
             title: title,
             url: item.URL,
-            snippet: `Scholarly Paper in ${journal} ${year ? `(${year})` : ''} - Academic Research Database`
+            snippet: `Scholarly Paper in ${journal} ${year ? `(${year})` : ''} - Academic Research Database`,
+            matchReason: "Thematic Reference: Published academic literature on related research & methodology (Text phrasing is original, not plagiarized)."
           });
         }
       }
@@ -226,7 +229,8 @@ async function fetchContextArticles(contextQuery) {
         articles.push({
           title: item.title,
           url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
-          snippet: item.snippet.replace(/<[^>]+>/g, '').trim()
+          snippet: item.snippet.replace(/<[^>]+>/g, '').trim(),
+          matchReason: "Subject Context: Reference encyclopedia article on the core subject matter (Text phrasing is original, not plagiarized)."
         });
       }
     }

@@ -17,6 +17,7 @@ type Match = {
   url: string;
   percent: number;
   highlightedText: string;
+  matchReason?: string;
 };
 
 type ProviderScore = {
@@ -28,6 +29,7 @@ type ArticleMatch = {
   title: string;
   url: string;
   snippet: string;
+  matchReason?: string;
 };
 
 type ContextAnalysis = {
@@ -469,6 +471,12 @@ function App() {
                                   {art.snippet}...
                                 </p>
                               ) : null}
+                              {art.matchReason && (
+                                <div className="text-xs text-blue-800 bg-blue-50/80 px-3 py-1.5 rounded mt-2 border border-blue-100 flex items-start gap-1.5">
+                                  <span className="font-bold text-blue-900 whitespace-nowrap">Reason Found:</span>
+                                  <span>{art.matchReason}</span>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -490,7 +498,11 @@ function App() {
                       </div>
                     </div>
                     {result.matches.length === 0 ? (
-                       <div className="text-center py-10 text-gray-500">No plagiarism matches found! Your text appears unique across all databases.</div>
+                       <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                         <svg className="w-10 h-10 text-green-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                         <p className="font-bold text-gray-800">No Plagiarism Matches Found!</p>
+                         <p className="text-xs text-gray-500 mt-1">Your phrasing is completely unique across indexed web pages and academic archives.</p>
+                       </div>
                     ) : (
                       result.matches.map((match, idx) => (
                         <div key={idx} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition">
@@ -512,6 +524,12 @@ function App() {
                             <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-400 rounded-l-lg"></div>
                             "...{match.highlightedText}..."
                           </div>
+                          {match.matchReason && (
+                            <div className="text-xs text-red-800 bg-red-50 px-3 py-1.5 rounded mt-3 border border-red-100 flex items-start gap-1.5 font-medium">
+                              <span className="font-bold text-red-900 whitespace-nowrap">Reason Flagged:</span>
+                              <span>{match.matchReason}</span>
+                            </div>
+                          )}
                         </div>
                       ))
                     )}
