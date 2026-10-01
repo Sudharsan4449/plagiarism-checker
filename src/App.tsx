@@ -38,6 +38,34 @@ type ContextAnalysis = {
   relatedArticles: ArticleMatch[];
 };
 
+type CitationItem = {
+  author: string;
+  year: string;
+  raw: string;
+  type: 'Parenthetical' | 'Narrative';
+};
+
+type CitationAudit = {
+  totalCitations: number;
+  distinctAuthorsCount: number;
+  citationsSample: CitationItem[];
+  hasReferenceSection: boolean;
+  referenceListEntries: number;
+  supportLevel: string;
+  citationDensity: number;
+  uncitedParagraphsCount: number;
+  totalWords: number;
+};
+
+type MethodologyAnalysis = {
+  detectedType: string;
+  qualitativeTermsFound: string[];
+  quantitativeTermsFound: string[];
+  hasHypotheses: boolean;
+  hasSamplingStrategy: boolean;
+  hasDataCollection: boolean;
+};
+
 type Result = {
   score: number;
   aiProbability: number;
@@ -47,6 +75,9 @@ type Result = {
   aiProviders: ProviderScore[];
   plagiarismProviders: ProviderScore[];
   contextAnalysis?: ContextAnalysis;
+  citationAudit?: CitationAudit;
+  methodologyAnalysis?: MethodologyAnalysis;
+  wordCount?: number;
 };
 
 function App() {
@@ -57,7 +88,7 @@ function App() {
   const [isChecking, setIsChecking] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
-  const [activeTab, setActiveTab] = useState<'matches' | 'context' | 'ai' | 'grammar'>('matches');
+  const [activeTab, setActiveTab] = useState<'matches' | 'citations' | 'methodology' | 'context' | 'ai' | 'grammar'>('matches');
   const [errorMsg, setErrorMsg] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -193,7 +224,27 @@ function App() {
         keywords: [],
         topicQuery: '',
         relatedArticles: []
-      }
+      },
+      citationAudit: {
+        totalCitations: 0,
+        distinctAuthorsCount: 0,
+        citationsSample: [],
+        hasReferenceSection: false,
+        referenceListEntries: 0,
+        supportLevel: 'Client Mode',
+        citationDensity: 0,
+        uncitedParagraphsCount: 0,
+        totalWords: text.trim().split(/\s+/).filter(Boolean).length
+      },
+      methodologyAnalysis: {
+        detectedType: 'General Analysis',
+        qualitativeTermsFound: [],
+        quantitativeTermsFound: [],
+        hasHypotheses: false,
+        hasSamplingStrategy: false,
+        hasDataCollection: false
+      },
+      wordCount: text.trim().split(/\s+/).filter(Boolean).length
     });
   };
 
@@ -354,27 +405,31 @@ function App() {
             </div>
             
             <div className="p-6 sm:p-8">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="col-span-1 bg-white rounded-xl p-6 flex flex-col items-center justify-center border-2 border-red-100 shadow-sm relative overflow-hidden group">
-                  <span className="text-5xl font-black text-red-600 relative z-10">{result.score}%</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                <div className="bg-white rounded-xl p-5 flex flex-col items-center justify-center border-2 border-red-100 shadow-sm relative overflow-hidden group">
+                  <span className="text-4xl font-black text-red-600 relative z-10">{result.score}%</span>
                   <span className="text-red-800 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">Avg Plagiarized</span>
                 </div>
-                <div className="col-span-1 bg-white rounded-xl p-6 flex flex-col items-center justify-center border-2 border-green-100 shadow-sm relative overflow-hidden group">
-                  <span className="text-5xl font-black text-green-600 relative z-10">{100 - result.score}%</span>
+                <div className="bg-white rounded-xl p-5 flex flex-col items-center justify-center border-2 border-green-100 shadow-sm relative overflow-hidden group">
+                  <span className="text-4xl font-black text-green-600 relative z-10">{100 - result.score}%</span>
                   <span className="text-green-800 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">Avg Unique</span>
                 </div>
-                <div className="col-span-1 bg-white rounded-xl p-6 flex flex-col items-center justify-center border-2 border-purple-100 shadow-sm relative overflow-hidden group">
-                  <span className="text-5xl font-black text-purple-600 relative z-10">{result.aiProbability}%</span>
+                <div className="bg-white rounded-xl p-5 flex flex-col items-center justify-center border-2 border-purple-100 shadow-sm relative overflow-hidden group">
+                  <span className="text-4xl font-black text-purple-600 relative z-10">{result.aiProbability}%</span>
                   <span className="text-purple-800 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">Consensus AI Prob</span>
                 </div>
-                <div className="col-span-1 bg-white rounded-xl p-6 flex flex-col items-center justify-center border-2 border-yellow-100 shadow-sm relative overflow-hidden group">
-                  <span className="text-5xl font-black text-yellow-600 relative z-10">{result.grammarErrors}</span>
-                  <span className="text-yellow-800 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">Grammar Issues</span>
+                <div className="bg-white rounded-xl p-5 flex flex-col items-center justify-center border-2 border-blue-100 shadow-sm relative overflow-hidden group">
+                  <span className="text-4xl font-black text-blue-600 relative z-10">{result.citationAudit?.totalCitations ?? 0}</span>
+                  <span className="text-blue-800 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">APA Citations</span>
+                </div>
+                <div className="bg-white rounded-xl p-5 flex flex-col items-center justify-center border-2 border-slate-100 shadow-sm relative overflow-hidden group">
+                  <span className="text-4xl font-black text-slate-700 relative z-10">{result.wordCount ?? result.text.trim().split(/\s+/).filter(Boolean).length}</span>
+                  <span className="text-slate-600 font-bold mt-2 relative z-10 uppercase tracking-wide text-xs text-center">Total Words</span>
                 </div>
               </div>
 
-              <div className="border-b border-gray-200 mb-6">
-                <nav className="-mb-px flex space-x-8">
+              <div className="border-b border-gray-200 mb-6 overflow-x-auto">
+                <nav className="-mb-px flex space-x-6 min-w-max">
                   <button
                     onClick={() => setActiveTab('matches')}
                     className={`${activeTab === 'matches' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition`}
@@ -382,10 +437,27 @@ function App() {
                     Plagiarism Breakdown
                   </button>
                   <button
+                    onClick={() => setActiveTab('citations')}
+                    className={`${activeTab === 'citations' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition flex items-center gap-1.5`}
+                  >
+                    Literature & APA Citations
+                    {result.citationAudit?.totalCitations ? (
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                        {result.citationAudit.totalCitations}
+                      </span>
+                    ) : null}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('methodology')}
+                    className={`${activeTab === 'methodology' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition`}
+                  >
+                    Methodology Intelligence
+                  </button>
+                  <button
                     onClick={() => setActiveTab('context')}
                     className={`${activeTab === 'context' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition flex items-center gap-1.5`}
                   >
-                    Topic & Article Context
+                    Topic Literature
                     {result.contextAnalysis?.relatedArticles?.length ? (
                       <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">
                         {result.contextAnalysis.relatedArticles.length}
@@ -408,6 +480,168 @@ function App() {
               </div>
 
               <div className="min-h-[200px]">
+                {activeTab === 'citations' && (
+                  <div className="space-y-6">
+                    <div className="bg-blue-50 border border-blue-200 p-6 rounded-xl">
+                      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                        <h3 className="font-bold text-blue-900 text-lg flex items-center gap-2">
+                          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                          APA 7th Edition Literature & Citation Audit
+                        </h3>
+                        <span className="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
+                          {result.citationAudit?.supportLevel || 'Literature Analysis Active'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-blue-800">
+                        Academic assessments strictly require claims and arguments to be supported by literature using APA 7th Edition formatting.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">In-Text Citations</span>
+                        <div className="text-3xl font-black text-blue-600 mt-1">{result.citationAudit?.totalCitations || 0}</div>
+                        <span className="text-xs text-gray-500 mt-1 block">Parenthetical & Narrative</span>
+                      </div>
+                      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Distinct Cited Authors</span>
+                        <div className="text-3xl font-black text-indigo-600 mt-1">{result.citationAudit?.distinctAuthorsCount || 0}</div>
+                        <span className="text-xs text-gray-500 mt-1 block">Scholarly contributors</span>
+                      </div>
+                      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Reference List Section</span>
+                        <div className="text-2xl font-black text-gray-900 mt-1">
+                          {result.citationAudit?.hasReferenceSection ? '✓ Detected' : '✗ Missing'}
+                        </div>
+                        <span className="text-xs text-gray-500 mt-1 block">
+                          {result.citationAudit?.referenceListEntries ? `${result.citationAudit.referenceListEntries} references listed` : 'No references block found'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {result.citationAudit && result.citationAudit.uncitedParagraphsCount > 0 ? (
+                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
+                        <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <div>
+                          <h4 className="text-sm font-bold text-amber-900">Literature Backing Alert</h4>
+                          <p className="text-xs text-amber-800 mt-0.5">
+                            We detected {result.citationAudit.uncitedParagraphsCount} substantial paragraphs without in-text citations. Make sure key claims, methodologies, and findings are backed by academic literature.
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {result.citationAudit?.citationsSample?.length ? (
+                      <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                        <h4 className="font-bold text-gray-900 text-sm mb-4">Sample In-Text Citations Detected</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {result.citationAudit.citationsSample.map((cite, i) => (
+                            <div key={i} className="bg-gray-50 p-3 rounded-lg border border-gray-100 flex items-center justify-between">
+                              <span className="font-mono text-sm text-blue-900 font-semibold">{cite.raw}</span>
+                              <span className="text-xs bg-white text-gray-600 font-bold px-2 py-0.5 rounded border border-gray-200">
+                                {cite.type}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-gray-500 text-sm">
+                        No in-text citations detected. Add APA 7th citations like (Author, Year) to support your answer.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'methodology' && (
+                  <div className="space-y-6">
+                    <div className="bg-indigo-50 border border-indigo-200 p-6 rounded-xl">
+                      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                        <h3 className="font-bold text-indigo-900 text-lg flex items-center gap-2">
+                          <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                          Research Methodology Intelligence
+                        </h3>
+                        <span className="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
+                          {result.methodologyAnalysis?.detectedType || 'Research Classification Active'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-indigo-800">
+                        Our engine automatically infers the underlying research methodology directly from your submitted answer text.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">Hypotheses Formulation</span>
+                          <span className="text-sm font-bold text-gray-800 mt-1 block">
+                            {result.methodologyAnalysis?.hasHypotheses ? '✓ Formal Hypotheses Found' : '— None Detected'}
+                          </span>
+                        </div>
+                        <span className={`w-3 h-3 rounded-full ${result.methodologyAnalysis?.hasHypotheses ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">Sampling Strategy</span>
+                          <span className="text-sm font-bold text-gray-800 mt-1 block">
+                            {result.methodologyAnalysis?.hasSamplingStrategy ? '✓ Strategy Discussed' : '— None Detected'}
+                          </span>
+                        </div>
+                        <span className={`w-3 h-3 rounded-full ${result.methodologyAnalysis?.hasSamplingStrategy ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">Data Collection Protocol</span>
+                          <span className="text-sm font-bold text-gray-800 mt-1 block">
+                            {result.methodologyAnalysis?.hasDataCollection ? '✓ Methods Specified' : '— None Detected'}
+                          </span>
+                        </div>
+                        <span className={`w-3 h-3 rounded-full ${result.methodologyAnalysis?.hasDataCollection ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                        <h4 className="font-bold text-gray-900 text-sm mb-3 text-purple-900 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                          Qualitative Concepts Identified
+                        </h4>
+                        {result.methodologyAnalysis?.qualitativeTermsFound?.length ? (
+                          <div className="flex flex-wrap gap-2">
+                            {result.methodologyAnalysis.qualitativeTermsFound.map((term, i) => (
+                              <span key={i} className="bg-purple-50 text-purple-800 text-xs font-semibold px-3 py-1 rounded-full border border-purple-100">
+                                {term}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500">No specific qualitative methodology terms identified in this answer.</p>
+                        )}
+                      </div>
+
+                      <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                        <h4 className="font-bold text-gray-900 text-sm mb-3 text-blue-900 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                          Quantitative Concepts Identified
+                        </h4>
+                        {result.methodologyAnalysis?.quantitativeTermsFound?.length ? (
+                          <div className="flex flex-wrap gap-2">
+                            {result.methodologyAnalysis.quantitativeTermsFound.map((term, i) => (
+                              <span key={i} className="bg-blue-50 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full border border-blue-100">
+                                {term}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500">No specific quantitative methodology terms identified in this answer.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {activeTab === 'context' && (
                   <div className="space-y-6">
                     <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl">

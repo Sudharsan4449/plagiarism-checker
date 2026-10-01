@@ -241,6 +241,118 @@ async function fetchContextArticles(contextQuery) {
   return articles;
 }
 
+function analyzeLiteratureAndCitations(text) {
+  // Reference section detection (references, bibliography, works cited)
+  const hasReferenceSection = /(?:^|\n)\s*(?:references|bibliography|works\s+cited)\s*(?:\n|$)/i.test(text);
+  
+  let bodyText = text;
+  let referenceListEntries = 0;
+  if (hasReferenceSection) {
+    const refSplit = text.split(/(?:^|\n)\s*(?:references|bibliography|works\s+cited)\s*(?:\n|$)/i);
+    if (refSplit.length > 1) {
+      bodyText = refSplit.slice(0, -1).join('\n');
+      const refBlock = refSplit[refSplit.length - 1];
+      const entries = refBlock.split(/\n+/).filter(line => line.trim().length > 20 && /[12]\d{3}/.test(line));
+      referenceListEntries = entries.length;
+    }
+  }
+
+  // APA in-text parenthetical citations: (Author, Year) or (Author & Author, Year) or (Author et al., Year)
+  const parentheticalRegex = /\(([A-Z][A-Za-z\s\.\-&]+?),\s*([12]\d{3}[a-z]?(?:,\s*pp?\.?\s*\d+(?:-\d+)?)?)\)/g;
+  
+  // APA in-text narrative citations: Author (Year) or Author & Author (Year) or Author et al. (Year)
+  const narrativeRegex = /\b([A-Z][A-Za-z\.\-]+(?:\s+(?:&|and)\s+[A-Z][A-Za-z\.\-]+)?(?:\s+et\s+al\.)?)\s*\(([12]\d{3}[a-z]?)\)/g;
+
+  const parentheticalMatches = [...bodyText.matchAll(parentheticalRegex)];
+  const narrativeMatches = [...bodyText.matchAll(narrativeRegex)];
+
+  const allCitations = [];
+  const distinctAuthors = new Set();
+
+  for (const m of parentheticalMatches) {
+    const author = m[1].trim();
+    const year = m[2].trim();
+    allCitations.push({ author, year, raw: m[0], type: 'Parenthetical' });
+    distinctAuthors.add(author.replace(/,\s*et\s*al\./, ''));
+  }
+
+  for (const m of narrativeMatches) {
+    const author = m[1].trim();
+    const year = m[2].trim();
+    allCitations.push({ author, year, raw: m[0], type: 'Narrative' });
+    distinctAuthors.add(author.replace(/\s*et\s*al\./, ''));
+  }
+
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  const citationDensity = words > 0 ? (allCitations.length / (words / 500)) : 0;
+
+  // Literature Support Health Rating
+  let supportLevel = 'Limited Literature Support';
+  if (allCitations.length >= 8 && hasReferenceSection) {
+    supportLevel = 'Strong Academic Literature Support (APA 7th)';
+  } else if (allCitations.length >= 3) {
+    supportLevel = 'Moderate Literature Support';
+  }
+
+  // Detect paragraphs that may need literature backing
+  const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().split(/\s+/).length >= 40);
+  const uncitedParagraphsCount = paragraphs.filter(p => {
+    return !/\(([A-Z][A-Za-z\s\.\-&]+?),\s*([12]\d{3}[a-z]?)/.test(p) &&
+           !/\b[A-Z][A-Za-z\.\-]+\s*\(([12]\d{3}[a-z]?)\)/.test(p);
+  }).length;
+
+  return {
+    totalCitations: allCitations.length,
+    distinctAuthorsCount: distinctAuthors.size,
+    citationsSample: allCitations.slice(0, 10),
+    hasReferenceSection,
+    referenceListEntries,
+    supportLevel,
+    citationDensity: Math.round(citationDensity * 10) / 10,
+    uncitedParagraphsCount,
+    totalWords: words
+  };
+}
+
+function analyzeMethodologyIntelligence(text) {
+  const lower = text.toLowerCase();
+
+  const qualTerms = [
+    'thematic analysis', 'semi-structured interview', 'in-depth interview',
+    'qualitative', 'purposive sampling', 'braun and clarke', 'coding',
+    'transcription', 'phenomenology', 'grounded theory', 'case study',
+    'focus group', 'interview guide', 'triangulation', 'member checking'
+  ];
+
+  const quantTerms = [
+    'regression', 'hypothesis', 'hypotheses', 'pls-sem', 'structural equation',
+    'quantitative', 'likert scale', 'independent variable', 'dependent variable',
+    'p-value', 'cronbach', 'sample size', 'r-squared', 'descriptive statistics',
+    'inferential statistics', 'spss', 'smartpls', 'anova', 'correlation'
+  ];
+
+  const qualHits = qualTerms.filter(t => lower.includes(t));
+  const quantHits = quantTerms.filter(t => lower.includes(t));
+
+  let detectedType = 'General Academic Research';
+  if (qualHits.length >= 2 && quantHits.length >= 2) {
+    detectedType = 'Mixed Methods (Qualitative & Quantitative Analysis)';
+  } else if (qualHits.length >= 2) {
+    detectedType = 'Qualitative Research Methodology';
+  } else if (quantHits.length >= 2) {
+    detectedType = 'Quantitative Research Methodology';
+  }
+
+  return {
+    detectedType,
+    qualitativeTermsFound: qualHits.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
+    quantitativeTermsFound: quantHits.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
+    hasHypotheses: /h[1-5]\s*:/i.test(text) || /hypothesis\s*[1-5]/i.test(text),
+    hasSamplingStrategy: /sampling\s+(?:strategy|method|technique)|purposive|stratified|random/i.test(text),
+    hasDataCollection: /data\s+collection|interviews?|surveys?|questionnaires?/i.test(text)
+  };
+}
+
 export default async function handler(req, res) {
   // CORS configuration
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -441,6 +553,9 @@ export default async function handler(req, res) {
       contextPromise
     ]);
 
+    const citationResult = analyzeLiteratureAndCitations(text);
+    const methodologyResult = analyzeMethodologyIntelligence(text);
+
     return res.status(200).json({
       score: plagiarismResult.score,
       aiProbability: aiResult.aiProbability,
@@ -449,6 +564,9 @@ export default async function handler(req, res) {
       aiProviders: aiResult.aiProviders,
       plagiarismProviders: plagiarismResult.plagiarismProviders,
       contextAnalysis: contextResult,
+      citationAudit: citationResult,
+      methodologyAnalysis: methodologyResult,
+      wordCount: citationResult.totalWords,
       text: text
     });
   } catch (error) {
