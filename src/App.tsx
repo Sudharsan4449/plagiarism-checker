@@ -17,7 +17,7 @@ type Result = {
 
 function App() {
   const [text, setText] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(import.meta.env.VITE_EDEN_API_KEY || '');
   const [showSettings, setShowSettings] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
