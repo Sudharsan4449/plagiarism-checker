@@ -140,6 +140,62 @@ function analyzeAILinguistics(text) {
   };
 }
 
+function extractContextAndKeywords(text) {
+  const stopwords = new Set([
+    'the','and','was','that','with','for','this','are','from','have','were',
+    'which','been','they','their','also','about','after','into','more','other',
+    'some','these','than','them','then','when','where','what','will','would',
+    'there','could','first','became','between','each','most','through','over',
+    'such','because','being','both','does','doing','down','during','having',
+    'here','just','like','only','same','should','very','your'
+  ]);
+
+  const cleanWords = text.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !stopwords.has(w));
+
+  const freq = {};
+  for (const w of cleanWords) {
+    freq[w] = (freq[w] || 0) + 1;
+  }
+
+  const sortedKeywords = Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(entry => entry[0]);
+
+  const displayKeywords = sortedKeywords.map(w => w.charAt(0).toUpperCase() + w.slice(1));
+  const mainContextQuery = sortedKeywords.slice(0, 4).join(' ');
+
+  return {
+    keywords: displayKeywords,
+    query: mainContextQuery
+  };
+}
+
+async function fetchContextArticles(contextQuery) {
+  if (!contextQuery || contextQuery.trim().length === 0) return [];
+  const articles = [];
+  try {
+    const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(contextQuery)}&utf8=&format=json`;
+    const res = await fetch(wikiUrl, { headers: { 'User-Agent': 'VeriCheckAcademic/2.0' } });
+    if (res.ok) {
+      const data = await res.json();
+      for (const item of (data.query?.search || []).slice(0, 4)) {
+        articles.push({
+          title: item.title,
+          url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
+          snippet: item.snippet.replace(/<[^>]+>/g, '').trim()
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Context articles fetch error:', e);
+  }
+  return articles;
+}
+
 export default async function handler(req, res) {
   // CORS configuration
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -322,10 +378,22 @@ export default async function handler(req, res) {
       };
     })();
 
-    const [grammarErrors, aiResult, plagiarismResult] = await Promise.all([
+    // 4. Topic Context & Academic Article Discovery
+    const contextPromise = (async () => {
+      const { keywords, query } = extractContextAndKeywords(text);
+      const relatedArticles = await fetchContextArticles(query);
+      return {
+        keywords,
+        topicQuery: query,
+        relatedArticles
+      };
+    })();
+
+    const [grammarErrors, aiResult, plagiarismResult, contextResult] = await Promise.all([
       grammarPromise,
       aiPromise,
-      plagiarismPromise
+      plagiarismPromise,
+      contextPromise
     ]);
 
     return res.status(200).json({
@@ -335,6 +403,7 @@ export default async function handler(req, res) {
       matches: plagiarismResult.matches,
       aiProviders: aiResult.aiProviders,
       plagiarismProviders: plagiarismResult.plagiarismProviders,
+      contextAnalysis: contextResult,
       text: text
     });
   } catch (error) {

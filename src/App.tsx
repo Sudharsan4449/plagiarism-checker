@@ -24,6 +24,18 @@ type ProviderScore = {
   score: number;
 };
 
+type ArticleMatch = {
+  title: string;
+  url: string;
+  snippet: string;
+};
+
+type ContextAnalysis = {
+  keywords: string[];
+  topicQuery: string;
+  relatedArticles: ArticleMatch[];
+};
+
 type Result = {
   score: number;
   aiProbability: number;
@@ -32,6 +44,7 @@ type Result = {
   text: string;
   aiProviders: ProviderScore[];
   plagiarismProviders: ProviderScore[];
+  contextAnalysis?: ContextAnalysis;
 };
 
 function App() {
@@ -42,7 +55,7 @@ function App() {
   const [isChecking, setIsChecking] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
-  const [activeTab, setActiveTab] = useState<'matches' | 'grammar' | 'ai'>('matches');
+  const [activeTab, setActiveTab] = useState<'matches' | 'context' | 'ai' | 'grammar'>('matches');
   const [errorMsg, setErrorMsg] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -174,6 +187,11 @@ function App() {
         { name: "Academic & Journal Index", score: 0 }
       ],
       matches: [],
+      contextAnalysis: {
+        keywords: [],
+        topicQuery: '',
+        relatedArticles: []
+      }
     });
   };
 
@@ -362,6 +380,17 @@ function App() {
                     Plagiarism Breakdown
                   </button>
                   <button
+                    onClick={() => setActiveTab('context')}
+                    className={`${activeTab === 'context' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition flex items-center gap-1.5`}
+                  >
+                    Topic & Article Context
+                    {result.contextAnalysis?.relatedArticles?.length ? (
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                        {result.contextAnalysis.relatedArticles.length}
+                      </span>
+                    ) : null}
+                  </button>
+                  <button
                     onClick={() => setActiveTab('ai')}
                     className={`${activeTab === 'ai' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition`}
                   >
@@ -377,6 +406,76 @@ function App() {
               </div>
 
               <div className="min-h-[200px]">
+                {activeTab === 'context' && (
+                  <div className="space-y-6">
+                    <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3 className="font-bold text-blue-900 text-base">Assessment & Article Context Analysis</h3>
+                      </div>
+                      <p className="text-sm text-blue-800 mb-4">
+                        We analyzed the main context of this content and identified the core academic and subject themes. Compare this submission against published articles covering the same subject matter.
+                      </p>
+                      
+                      {result.contextAnalysis?.keywords?.length ? (
+                        <div>
+                          <span className="text-xs font-bold text-blue-900 uppercase tracking-wider block mb-2">Extracted Key Themes & Core Keywords:</span>
+                          <div className="flex flex-wrap gap-2">
+                            {result.contextAnalysis.keywords.map((kw, i) => (
+                              <span key={i} className="bg-white text-blue-800 text-xs font-semibold px-3 py-1 rounded-full border border-blue-200 shadow-sm">
+                                #{kw}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-lg mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                        Published Reference Articles on This Topic
+                      </h4>
+                      <p className="text-sm text-gray-500 mb-4">
+                        Existing literature and articles that cover the exact subject matter of this submission:
+                      </p>
+
+                      {(!result.contextAnalysis?.relatedArticles || result.contextAnalysis.relatedArticles.length === 0) ? (
+                        <div className="text-center py-8 bg-gray-50 rounded-xl text-gray-500 text-sm">
+                          No specific external articles found for this topic context.
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {result.contextAnalysis.relatedArticles.map((art, idx) => (
+                            <div key={idx} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <h5 className="font-bold text-gray-900 text-base hover:text-blue-600 transition">
+                                    <a href={art.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                      {art.title}
+                                      <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                    </a>
+                                  </h5>
+                                  <a href={art.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline break-all mt-0.5 inline-block">
+                                    {art.url}
+                                  </a>
+                                </div>
+                                <span className="bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ml-4 border border-blue-100">
+                                  Related Literature
+                                </span>
+                              </div>
+                              {art.snippet ? (
+                                <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2.5 rounded border border-gray-100">
+                                  {art.snippet}...
+                                </p>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {activeTab === 'matches' && (
                   <div className="space-y-6">
                     <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
