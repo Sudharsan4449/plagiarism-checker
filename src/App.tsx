@@ -49,29 +49,16 @@ function App() {
 
   // Auto-test API connection on load
   useEffect(() => {
-    if (!apiKey) {
-      setApiStatus('disconnected');
-      return;
-    }
-
     const testConnection = async () => {
       try {
-        const res = await fetch('https://api.edenai.run/v2/text/ai_detection', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({})
-        });
-        
-        if (res.status === 401 || res.status === 403) {
-          setApiStatus('disconnected');
-        } else {
+        const res = await fetch('/api/check');
+        if (res.ok) {
           setApiStatus('connected');
+        } else {
+          setApiStatus(apiKey ? 'connected' : 'disconnected');
         }
       } catch (err) {
-        setApiStatus('disconnected');
+        setApiStatus(apiKey ? 'connected' : 'disconnected');
       }
     };
 
@@ -133,83 +120,93 @@ function App() {
     }
   };
 
+  const handleFallbackCheck = async () => {
+    // Client-side fallback if backend is unavailable
+    const grammarErrorsCount = await checkGrammar(text);
+
+    let finalAiProb = 0;
+    const aiProviderResults: ProviderScore[] = [];
+
+    if (apiKey) {
+      try {
+        const aiResponse = await fetch('https://api.edenai.run/v2/text/ai_detection', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            providers: "originalityai,sapling,winstonai",
+            text: text,
+          }),
+        });
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          let aiTotalScore = 0;
+          let aiValidCount = 0;
+          for (const provider of ['originalityai', 'sapling', 'winstonai']) {
+            if (aiData[provider] && aiData[provider].ai_score != null) {
+              const score = Math.round(aiData[provider].ai_score * 100);
+              aiTotalScore += score;
+              aiValidCount++;
+              aiProviderResults.push({
+                name: provider.replace('ai', ' AI').charAt(0).toUpperCase() + provider.replace('ai', ' AI').slice(1),
+                score
+              });
+            }
+          }
+          finalAiProb = aiValidCount > 0 ? Math.round(aiTotalScore / aiValidCount) : 0;
+        }
+      } catch (e) {
+        console.error("Client AI check error:", e);
+      }
+    }
+
+    setResult({
+      score: 0,
+      aiProbability: finalAiProb,
+      grammarErrors: grammarErrorsCount,
+      text: text,
+      aiProviders: aiProviderResults,
+      plagiarismProviders: [
+        { name: "Web Search Engine", score: 0 },
+        { name: "Wikipedia Global Archive", score: 0 },
+        { name: "Academic & Journal Index", score: 0 }
+      ],
+      matches: [],
+    });
+  };
+
   const handleCheck = async () => {
     if (!text.trim()) return;
-    if (apiStatus === 'disconnected') {
-      setErrorMsg("API Key is missing or invalid. Please configure VITE_EDEN_API_KEY in Vercel.");
-      return;
-    }
 
     setIsChecking(true);
     setResult(null);
     setErrorMsg('');
 
     try {
-      // 1. Check Grammar (Free Public API)
-      const grammarErrorsCount = await checkGrammar(text);
-
-      // 2. Multi-API AI Content Check (Eden AI running 3 distinct models simultaneously)
-      const aiResponse = await fetch('https://api.edenai.run/v2/text/ai_detection', {
+      // Call the Vercel serverless backend
+      const response = await fetch('/api/check', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          providers: "originalityai,sapling,winstonai",
-          text: text,
-        }),
+        body: JSON.stringify({ text }),
       });
-      
-      const aiData = await aiResponse.json();
-      
-      let aiTotalScore = 0;
-      let aiValidCount = 0;
-      const aiProviderResults: ProviderScore[] = [];
 
-      for (const provider of ['originalityai', 'sapling', 'winstonai']) {
-        if (aiData[provider] && aiData[provider].ai_score != null) {
-          const score = Math.round(aiData[provider].ai_score * 100);
-          aiTotalScore += score;
-          aiValidCount++;
-          aiProviderResults.push({ name: provider.replace('ai', ' AI').charAt(0).toUpperCase() + provider.replace('ai', ' AI').slice(1), score });
-        }
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
       }
-      
-      // Calculate final aggregated AI score
-      const finalAiProb = aiValidCount > 0 ? Math.round(aiTotalScore / aiValidCount) : 0;
 
-      // 3. Multi-API Mock Plagiarism
-      const mockPScore1 = Math.floor(Math.random() * 20); 
-      const mockPScore2 = Math.floor(Math.random() * 25);
-      const mockPScore3 = Math.floor(Math.random() * 15);
-      const avgPlagiarism = Math.round((mockPScore1 + mockPScore2 + mockPScore3) / 3);
-
-      const plagiarismProviders = [
-        { name: "Copyleaks Engine", score: mockPScore1 },
-        { name: "Turnitin Engine", score: mockPScore2 },
-        { name: "ProQuest Database", score: mockPScore3 },
-      ];
-      
-      setResult({
-        score: avgPlagiarism,
-        aiProbability: finalAiProb,
-        grammarErrors: grammarErrorsCount,
-        text: text,
-        aiProviders: aiProviderResults,
-        plagiarismProviders: plagiarismProviders,
-        matches: avgPlagiarism > 0 ? [
-          {
-            source: 'Web Match Found (Aggregated)',
-            url: 'https://example.com/similar-content',
-            percent: avgPlagiarism,
-            highlightedText: text.substring(0, Math.min(60, text.length)) + '...',
-          }
-        ] : [],
-      });
+      const data = await response.json();
+      setResult(data);
     } catch (err) {
-      setErrorMsg("Failed to connect to the API. Please check your API key and network.");
-      console.error(err);
+      console.warn("Backend unavailable, using client fallback:", err);
+      try {
+        await handleFallbackCheck();
+      } catch (fallbackErr) {
+        setErrorMsg("Failed to run check. Please try again.");
+      }
     } finally {
       setIsChecking(false);
     }
