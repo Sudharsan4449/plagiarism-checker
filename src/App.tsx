@@ -114,6 +114,7 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [showReconstruction, setShowReconstruction] = useState(false);
   const [reconstructedTab, setReconstructedTab] = useState<'manuscript' | 'notes' | 'compare'>('manuscript');
+  const [citationMode, setCitationMode] = useState<'with' | 'without'>('with');
   const [copiedText, setCopiedText] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -368,6 +369,14 @@ function App() {
     return reconstructAcademicContent(result.text);
   }, [result]);
 
+  const activeVariant = useMemo(() => {
+    if (!reconstructedData) return null;
+    if (reconstructedData.userProvidedCitations) {
+      return reconstructedData.withCitations;
+    }
+    return citationMode === 'without' ? reconstructedData.withoutCitations : reconstructedData.withCitations;
+  }, [reconstructedData, citationMode]);
+
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length >= 2) {
       touchStartY.current = (e.touches[0].clientY + e.touches[1].clientY) / 2;
@@ -394,19 +403,21 @@ function App() {
   };
 
   const handleCopyReconstructed = () => {
-    if (!reconstructedData) return;
-    navigator.clipboard.writeText(reconstructedData.reconstructedPlainText);
+    const textToCopy = activeVariant ? activeVariant.plainText : reconstructedData?.reconstructedPlainText;
+    if (!textToCopy) return;
+    navigator.clipboard.writeText(textToCopy);
     setCopiedText(true);
     setTimeout(() => setCopiedText(false), 2000);
   };
 
   const handleDownloadDoc = () => {
-    if (!reconstructedData) return;
-    const blob = new Blob([reconstructedData.reconstructedPlainText], { type: 'text/plain;charset=utf-8' });
+    const textToDownload = activeVariant ? activeVariant.plainText : reconstructedData?.reconstructedPlainText;
+    if (!textToDownload) return;
+    const blob = new Blob([textToDownload], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Reconstructed_Academic_Submission_${Date.now()}.txt`;
+    a.download = `Reconstructed_Academic_Submission_${citationMode === 'without' && !reconstructedData?.userProvidedCitations ? 'Clean' : 'APA'}_${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1150,6 +1161,59 @@ function App() {
 
             {/* Page Body Container */}
             <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+              {/* Citations Handling: Dual Options when Zero Citations Detected */}
+              {!reconstructedData.userProvidedCitations ? (
+                <div className="bg-white border-2 border-black p-4 sm:p-5 rounded-sm shadow-xs mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-2.5 h-2.5 bg-[#ffd200] border border-black rounded-full"></span>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                        Citation & Reference Option (Zero Citations Detected in Input)
+                      </h3>
+                    </div>
+                    <p className="text-xs text-neutral-600">
+                      As requested, select whether to generate the reconstructed manuscript with or without APA literature citations & references:
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 self-start sm:self-auto bg-neutral-100 p-1 rounded-sm border border-neutral-300">
+                    <button
+                      onClick={() => setCitationMode('with')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-sm transition uppercase tracking-wider flex items-center gap-1.5 ${
+                        citationMode === 'with'
+                          ? 'bg-[#ffd200] text-black shadow-xs font-black'
+                          : 'text-neutral-600 hover:text-black hover:bg-neutral-200'
+                      }`}
+                    >
+                      <span className="text-[10px]">●</span>
+                      With APA & References
+                    </button>
+                    <button
+                      onClick={() => setCitationMode('without')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-sm transition uppercase tracking-wider flex items-center gap-1.5 ${
+                        citationMode === 'without'
+                          ? 'bg-black text-[#ffd200] shadow-xs font-black'
+                          : 'text-neutral-600 hover:text-black hover:bg-neutral-200'
+                      }`}
+                    >
+                      <span className="text-[10px]">●</span>
+                      Without APA & References
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white border border-neutral-300 p-4 rounded-sm shadow-xs mb-6 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs bg-black text-[#ffd200] font-black px-2 py-0.5 rounded-sm uppercase tracking-wider">
+                      Original Citations Detected
+                    </span>
+                    <span className="text-xs text-neutral-700 font-medium">
+                      Your draft contains scholarly citations or references. Reconstructed while preserving your original citations without artificial APA injection.
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Assessment 1 PDF Instructions Compliance Banner */}
               <div className="bg-white border-2 border-black p-5 sm:p-6 rounded-sm shadow-sm mb-8">
                 <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4 flex-wrap gap-2">
@@ -1160,7 +1224,7 @@ function App() {
                     </h3>
                   </div>
                   <span className="text-[11px] font-bold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-sm">
-                    Input Length: <strong className="text-black">{reconstructedData.wordCount} words</strong> • Citations Injected: <strong className="text-black">{reconstructedData.injectedCitationsCount} APA sources</strong>
+                    Input Length: <strong className="text-black">{reconstructedData.wordCount} words</strong> • Citations: <strong className="text-black">{activeVariant?.citationCount ?? 0} {citationMode === 'without' && !reconstructedData.userProvidedCitations ? '(Clean Mode)' : 'APA sources'}</strong>
                   </span>
                 </div>
 
@@ -1183,7 +1247,7 @@ function App() {
                     <strong>Word Count Flexibility:</strong> Assessment specifies 4,000–5,000 words for the total coursework, but accepts modular question-by-question drafting ({reconstructedData.wordCount} words).
                   </span>
                   <span className="text-black font-extrabold">
-                    Citation Density: {reconstructedData.citationDensity}
+                    Citation Density: {activeVariant?.citationDensity || reconstructedData.citationDensity}
                   </span>
                 </div>
               </div>
@@ -1202,7 +1266,7 @@ function App() {
                 >
                   APA 7th Literature Citation & Sourcing Notes
                   <span className="bg-[#ffd200] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-sm">
-                    {reconstructedData.citationNotes.length} Notes
+                    {activeVariant?.citationNotes.length ?? 0} Notes
                   </span>
                 </button>
                 <button
@@ -1216,61 +1280,84 @@ function App() {
               {/* TAB 1: RECONSTRUCTED MANUSCRIPT */}
               {reconstructedTab === 'manuscript' && (
                 <div className="bg-white border border-neutral-200 rounded-sm shadow-sm p-8 sm:p-14 mb-10 max-w-4xl mx-auto">
-                  <div dangerouslySetInnerHTML={{ __html: reconstructedData.reconstructedManuscriptHtml }} />
+                  <div dangerouslySetInnerHTML={{ __html: activeVariant?.manuscriptHtml || reconstructedData.reconstructedManuscriptHtml }} />
                 </div>
               )}
 
               {/* TAB 2: SEPARATE APA & CITATION NOTES SECTION */}
               {reconstructedTab === 'notes' && (
                 <div className="space-y-6">
-                  <div className="bg-neutral-50 border-l-4 border-[#ffd200] border-y border-r border-neutral-200 p-6 rounded-sm">
-                    <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                      <h3 className="font-black text-black text-lg">
-                        APA 7th Literature Citation & Sourcing Notes (Proportional to Word Count)
-                      </h3>
-                      <span className="bg-black text-[#ffd200] text-xs font-extrabold px-3 py-1 rounded-sm uppercase tracking-wider">
-                        {reconstructedData.injectedCitationsCount} Citations for {reconstructedData.wordCount} Words
+                  {(!activeVariant?.citationNotes || activeVariant.citationNotes.length === 0) ? (
+                    <div className="bg-white border border-neutral-200 p-8 rounded-sm text-center space-y-3">
+                      <span className="inline-block bg-neutral-100 text-neutral-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm">
+                        {reconstructedData.userProvidedCitations ? 'User-Provided Citations Detected' : 'Without APA & References Mode Selected'}
                       </span>
+                      <p className="text-sm text-neutral-600 max-w-lg mx-auto">
+                        {reconstructedData.userProvidedCitations
+                          ? 'Your original submission already included scholarly citations or references. Synthetic APA citation notes were not generated.'
+                          : 'You are currently viewing the "Without APA & References" option. Switch to "With APA & References" above to inspect dynamically integrated peer-reviewed literature notes.'}
+                      </p>
+                      {!reconstructedData.userProvidedCitations && (
+                        <button
+                          onClick={() => setCitationMode('with')}
+                          className="bg-[#ffd200] text-black text-xs font-black uppercase tracking-wider px-4 py-2 rounded-sm shadow-xs hover:bg-[#e6be00] transition inline-block mt-2"
+                        >
+                          Switch to "With APA & References"
+                        </button>
+                      )}
                     </div>
-                    <p className="text-sm text-neutral-600">
-                      As mandated in Assessment 1 Specific Instruction 7 ("Answers/points/content MUST be supported by literatures" & "Reference: use APA 7th Edition format"), the citations below were dynamically integrated proportional to your submission's word length.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    {reconstructedData.citationNotes.map((note, idx) => (
-                      <div key={idx} className="bg-white border border-neutral-200 rounded-sm p-5 hover:border-black transition-colors shadow-xs">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs bg-black text-[#ffd200] font-mono font-bold px-2 py-0.5 rounded-sm">
-                              Note #{idx + 1}
-                            </span>
-                            <span className="font-bold text-sm text-black">
-                              In-Text: <code className="bg-neutral-100 px-1.5 py-0.5 rounded font-mono font-bold">{note.citation}</code>
-                            </span>
-                          </div>
-                          <span className="text-xs font-extrabold text-neutral-400 uppercase tracking-widest">
-                            {note.source}
+                  ) : (
+                    <>
+                      <div className="bg-neutral-50 border-l-4 border-[#ffd200] border-y border-r border-neutral-200 p-6 rounded-sm">
+                        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                          <h3 className="font-black text-black text-lg">
+                            APA 7th Literature Citation & Sourcing Notes (Proportional to Word Count)
+                          </h3>
+                          <span className="bg-black text-[#ffd200] text-xs font-extrabold px-3 py-1 rounded-sm uppercase tracking-wider">
+                            {activeVariant.citationCount} Citations for {reconstructedData.wordCount} Words
                           </span>
                         </div>
-
-                        <div className="mt-3 bg-neutral-50 p-3 rounded-sm border border-neutral-200 text-xs font-serif leading-relaxed text-neutral-800">
-                          <strong>Full APA 7th Reference:</strong> {note.fullReference}
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                          <div className="bg-white p-2.5 rounded-sm border border-neutral-200">
-                            <span className="font-bold text-neutral-500 uppercase tracking-wider block mb-0.5 text-[10px]">Supported Analytical Claim:</span>
-                            <span className="text-neutral-900 font-medium">{note.supportedClaim}</span>
-                          </div>
-                          <div className="bg-white p-2.5 rounded-sm border border-neutral-200">
-                            <span className="font-bold text-neutral-500 uppercase tracking-wider block mb-0.5 text-[10px]">Assessment 1 Rationale:</span>
-                            <span className="text-neutral-900 font-medium">{note.relevanceRationale}</span>
-                          </div>
-                        </div>
+                        <p className="text-sm text-neutral-600">
+                          As mandated in Assessment 1 Specific Instruction 7 ("Answers/points/content MUST be supported by literatures" & "Reference: use APA 7th Edition format"), the citations below were dynamically integrated proportional to your submission's word length.
+                        </p>
                       </div>
-                    ))}
-                  </div>
+
+                      <div className="space-y-4">
+                        {activeVariant.citationNotes.map((note, idx) => (
+                          <div key={idx} className="bg-white border border-neutral-200 rounded-sm p-5 hover:border-black transition-colors shadow-xs">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs bg-black text-[#ffd200] font-mono font-bold px-2 py-0.5 rounded-sm">
+                                  Note #{idx + 1}
+                                </span>
+                                <span className="font-bold text-sm text-black">
+                                  In-Text: <code className="bg-neutral-100 px-1.5 py-0.5 rounded font-mono font-bold">{note.citation}</code>
+                                </span>
+                              </div>
+                              <span className="text-xs font-extrabold text-neutral-400 uppercase tracking-widest">
+                                {note.source}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 bg-neutral-50 p-3 rounded-sm border border-neutral-200 text-xs font-serif leading-relaxed text-neutral-800">
+                              <strong>Full APA 7th Reference:</strong> {note.fullReference}
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                              <div className="bg-white p-2.5 rounded-sm border border-neutral-200">
+                                <span className="font-bold text-neutral-500 uppercase tracking-wider block mb-0.5 text-[10px]">Supported Analytical Claim:</span>
+                                <span className="text-neutral-900 font-medium">{note.supportedClaim}</span>
+                              </div>
+                              <div className="bg-white p-2.5 rounded-sm border border-neutral-200">
+                                <span className="font-bold text-neutral-500 uppercase tracking-wider block mb-0.5 text-[10px]">Assessment 1 Rationale:</span>
+                                <span className="text-neutral-900 font-medium">{note.relevanceRationale}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1296,14 +1383,14 @@ function App() {
                   <div className="bg-white border-2 border-black rounded-sm p-6 shadow-xs">
                     <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
                       <span className="text-xs font-black uppercase tracking-widest text-black">
-                        Reconstructed Scholarly Text (APA 7th + Times New Roman 1.5)
+                        Reconstructed Scholarly Text {citationMode === 'without' && !reconstructedData.userProvidedCitations ? '(Clean / No Citations)' : '(APA 7th + Times New Roman 1.5)'}
                       </span>
                       <span className="text-[10px] bg-[#ffd200] text-black px-2 py-0.5 rounded font-mono font-black">
                         Assessment Compliant
                       </span>
                     </div>
                     <div className="text-sm font-serif leading-[1.8] text-justify text-neutral-900 max-h-[600px] overflow-y-auto pr-2 whitespace-pre-wrap">
-                      {reconstructedData.reconstructedPlainText}
+                      {activeVariant?.plainText || reconstructedData.reconstructedPlainText}
                     </div>
                   </div>
                 </div>
