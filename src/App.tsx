@@ -112,14 +112,6 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pipelineRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to pipeline when checking starts
-  useEffect(() => {
-    if (isChecking && pipelineRef.current) {
-      pipelineRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [isChecking]);
 
   // Auto-test API connection on load
   useEffect(() => {
@@ -415,14 +407,90 @@ function App() {
                 Multi-API Consensus Engine
               </div>
             </div>
-            <textarea
-              id="content"
-              rows={8}
-              className="w-full border border-gray-200 bg-gray-50 rounded-lg p-4 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800 shadow-inner"
-              placeholder="Paste your text here or upload a document to run real AI and Grammar checks..."
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
+            <div className="relative">
+              <textarea
+                id="content"
+                rows={8}
+                className="w-full border border-gray-200 bg-gray-50 rounded-lg p-4 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-800 shadow-inner font-mono text-sm leading-relaxed min-h-[220px]"
+                placeholder="Paste your text here or upload a document to run real AI and Grammar checks..."
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                disabled={isChecking}
+              />
+              {/* Sequential Deduction Overlay directly over the textarea */}
+              {isChecking && (
+                <div className="absolute inset-0 bg-white/95 backdrop-blur-[2px] rounded-lg border-2 border-blue-400 shadow-lg p-4 sm:p-5 flex flex-col justify-between z-20 transition-all duration-300">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
+                      <span className="text-xs font-black uppercase tracking-wider text-blue-900">
+                        Sequential Deduction Pipeline
+                      </span>
+                    </div>
+                    <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                      {deductionStep >= DEDUCTION_STEPS.length ? "Finalizing Report..." : `Stage ${deductionStep + 1} of ${DEDUCTION_STEPS.length}`}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 my-auto">
+                    {DEDUCTION_STEPS.map((step, idx) => {
+                      const isCompleted = idx < deductionStep;
+                      const isActive = idx === deductionStep;
+
+                      return (
+                        <div
+                          key={step.id}
+                          className={`flex items-center justify-between text-xs sm:text-sm py-1.5 px-3 rounded-md transition-all duration-500 ${
+                            isCompleted
+                              ? 'opacity-40 text-gray-400 bg-gray-50/80'
+                              : isActive
+                              ? 'text-blue-950 font-bold bg-blue-50/90 border border-blue-200 shadow-sm'
+                              : 'text-gray-400 opacity-40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            <span className={`font-semibold shrink-0 ${isCompleted ? 'line-through decoration-2 decoration-gray-400' : ''}`}>
+                              {step.label}:
+                            </span>
+                            <span className={`truncate ${isCompleted ? 'line-through decoration-2 decoration-gray-400' : ''}`}>
+                              {step.title}
+                            </span>
+                          </div>
+
+                          <div className="shrink-0 font-bold text-xs">
+                            {isCompleted && (
+                              <span className="text-emerald-600 flex items-center gap-1">
+                                ✓ Completed
+                              </span>
+                            )}
+                            {isActive && (
+                              <span className="text-blue-600 flex items-center gap-1.5 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                Deducing...
+                              </span>
+                            )}
+                            {!isCompleted && !isActive && (
+                              <span className="text-gray-300 font-normal">
+                                Pending
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-1.5 rounded-full transition-all duration-500 ease-out"
+                      style={{
+                        width: `${Math.min(100, Math.round(((deductionStep) / DEDUCTION_STEPS.length) * 100))}%`
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="flex items-center justify-between mt-3">
               <div className="flex items-center gap-4">
                 <input 
@@ -453,148 +521,6 @@ function App() {
             </div>
           </div>
 
-          {/* Sequential Deduction Pipeline placed directly inside main in full view */}
-          {isChecking && (
-            <div ref={pipelineRef} className="mt-6 mb-6 bg-gradient-to-b from-blue-50/90 to-white rounded-2xl border-2 border-blue-300 p-5 sm:p-7 shadow-lg transition-all">
-              <div className="flex items-center justify-between pb-4 border-b border-blue-100 mb-5 flex-wrap gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200">
-                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
-                      Sequential Deduction Pipeline
-                      <span className="text-xs bg-blue-100 text-blue-800 font-bold px-2.5 py-0.5 rounded-full">
-                        Live
-                      </span>
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Executing analytical checks sequentially across web indices and AI models
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black text-blue-700 bg-blue-50 px-3.5 py-1.5 rounded-full border border-blue-200 shadow-sm">
-                    {deductionStep >= DEDUCTION_STEPS.length ? "Finalizing Report..." : `Stage ${deductionStep + 1} of ${DEDUCTION_STEPS.length}`}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {DEDUCTION_STEPS.map((step, idx) => {
-                  const isCompleted = idx < deductionStep;
-                  const isActive = idx === deductionStep;
-
-                  return (
-                    <div
-                      key={step.id}
-                      className={`flex items-start gap-4 p-4 rounded-xl transition-all duration-500 ${
-                        isActive
-                          ? 'bg-white border-2 border-blue-500 shadow-md ring-2 ring-blue-100 scale-[1.01]'
-                          : isCompleted
-                          ? 'bg-gray-50/80 border border-gray-200 opacity-40'
-                          : 'border border-gray-100 opacity-40 bg-white'
-                      }`}
-                    >
-                      {/* Step Status Icon */}
-                      <div className="flex-shrink-0 mt-0.5">
-                        {isCompleted ? (
-                          <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black shadow-sm transition-all duration-500">
-                            ✓
-                          </div>
-                        ) : isActive ? (
-                          <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-200 transition-all duration-500">
-                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          </div>
-                        ) : (
-                          <div className="w-7 h-7 rounded-full border-2 border-gray-300 text-gray-400 flex items-center justify-center text-xs font-bold">
-                            {step.id}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Step Text with Horizontal Cut and Fade when Completed */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded transition-all duration-500 ${
-                                isCompleted
-                                  ? 'bg-gray-200 text-gray-500 line-through decoration-gray-400'
-                                  : isActive
-                                  ? 'bg-blue-600 text-white shadow-sm'
-                                  : 'bg-gray-100 text-gray-400'
-                              }`}
-                            >
-                              {step.label}
-                            </span>
-                            <span
-                              className={`text-sm sm:text-base font-bold transition-all duration-500 ${
-                                isCompleted
-                                  ? 'line-through decoration-2 decoration-gray-400 text-gray-500'
-                                  : isActive
-                                  ? 'text-blue-950 font-black'
-                                  : 'text-gray-500'
-                              }`}
-                            >
-                              {step.title}
-                            </span>
-                          </div>
-
-                          {isCompleted && (
-                            <span className="text-xs font-bold text-emerald-600 whitespace-nowrap flex items-center gap-1">
-                              ✓ Completed
-                            </span>
-                          )}
-                          {isActive && (
-                            <span className="text-xs font-extrabold text-blue-600 whitespace-nowrap flex items-center gap-1.5 animate-pulse">
-                              <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                              In Progress...
-                            </span>
-                          )}
-                        </div>
-
-                        <p
-                          className={`text-xs mt-1 transition-all duration-500 leading-relaxed ${
-                            isCompleted
-                              ? 'line-through decoration-gray-300 text-gray-400'
-                              : isActive
-                              ? 'text-blue-900 font-medium'
-                              : 'text-gray-400'
-                          }`}
-                        >
-                          {step.detail}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Bottom Progress Tracker */}
-              <div className="mt-5 pt-4 border-t border-blue-100 flex items-center gap-4">
-                <div className="w-full bg-blue-100 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
-                    style={{
-                      width: `${Math.min(100, Math.round(((deductionStep) / DEDUCTION_STEPS.length) * 100))}%`
-                    }}
-                  ></div>
-                </div>
-                <span className="text-xs font-black text-blue-700 whitespace-nowrap min-w-[3rem] text-right">
-                  {Math.min(100, Math.round(((deductionStep) / DEDUCTION_STEPS.length) * 100))}%
-                </span>
-              </div>
-            </div>
-          )}
-
           <div className="flex justify-end mt-4">
             <button
               onClick={handleCheck}
@@ -604,7 +530,7 @@ function App() {
               {isChecking ? (
                 <>
                   <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping"></span>
-                  Running Deduction Pipeline ({Math.min(deductionStep + 1, DEDUCTION_STEPS.length)}/{DEDUCTION_STEPS.length})...
+                  Analyzing ({Math.min(deductionStep + 1, DEDUCTION_STEPS.length)}/{DEDUCTION_STEPS.length})...
                 </>
               ) : (
                 'Run Consensus Check'
