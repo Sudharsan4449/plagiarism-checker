@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
-import { reconstructAcademicContent, ReconstructedData } from './reconstruct';
+import { reconstructAcademicContent } from './reconstruct';
+import type { ReconstructedData } from './reconstruct';
 
 // Configure PDF.js worker to use CDN to avoid Vite build complexities
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;

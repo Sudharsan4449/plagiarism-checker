@@ -20,7 +20,7 @@ export type ComplianceCheck = {
   detail: string;
 };
 
-export type ReconstructedData = {
+export interface ReconstructedData {
   title: string;
   wordCount: number;
   injectedCitationsCount: number;
@@ -30,7 +30,7 @@ export type ReconstructedData = {
   reconstructedPlainText: string;
   references: string[];
   citationNotes: CitationNote[];
-};
+}
 
 // Peer-reviewed scholarly literature database categorized by methodological & academic domain
 const SCHOLARLY_CITATIONS_DB = {
