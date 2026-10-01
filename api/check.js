@@ -71,6 +71,31 @@ async function searchWebAndWiki(phrase) {
     console.error('DuckDuckGo search error:', err.message);
   }
 
+  // 3. Search Crossref Academic & Research Literature Index
+  try {
+    const crossrefUrl = `https://api.crossref.org/works?query.bibliographic=${query}&rows=2`;
+    const res = await fetch(crossrefUrl, {
+      headers: { 'User-Agent': 'VeriCheckAcademic/2.0 (mailto:scholar-check@example.com)' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const items = data.message?.items || [];
+      for (const item of items) {
+        const title = item.title?.[0];
+        if (title && item.URL) {
+          matches.push({
+            source: `Academic Paper: ${title}`,
+            url: item.URL,
+            snippet: `Indexed in CrossRef scholarly literature database`,
+            matchedPhrase: phrase
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Crossref search error:', err.message);
+  }
+
   return matches;
 }
 
@@ -147,7 +172,18 @@ function extractContextAndKeywords(text) {
     'some','these','than','them','then','when','where','what','will','would',
     'there','could','first','became','between','each','most','through','over',
     'such','because','being','both','does','doing','down','during','having',
-    'here','just','like','only','same','should','very','your'
+    'here','just','like','only','same','should','very','your','used','using',
+    'using','conducted','paper','study','article','author','authors'
+  ]);
+
+  // Academic, analytical, quantitative, qualitative and research method priority terms
+  const domainTerms = new Set([
+    'regression','anova','econometric','econometrics','qualitative','quantitative',
+    'thematic','methodology','analytics','variance','correlation','hypothesis',
+    'sample','survey','empirical','clustering','predictive','multivariate',
+    'estimation','dataset','variable','variables','statistical','modeling',
+    'inference','grounded','heteroskedasticity','multicollinearity','p-value',
+    'confidence','interval','longitudinal','cross-sectional','triangulation'
   ]);
 
   const cleanWords = text.toLowerCase()
@@ -157,7 +193,9 @@ function extractContextAndKeywords(text) {
 
   const freq = {};
   for (const w of cleanWords) {
-    freq[w] = (freq[w] || 0) + 1;
+    // Boost domain research and analytical terms so they appear as key context
+    const weight = domainTerms.has(w) ? 3 : 1;
+    freq[w] = (freq[w] || 0) + weight;
   }
 
   const sortedKeywords = Object.entries(freq)
@@ -177,12 +215,39 @@ function extractContextAndKeywords(text) {
 async function fetchContextArticles(contextQuery) {
   if (!contextQuery || contextQuery.trim().length === 0) return [];
   const articles = [];
+
+  // 1. Crossref Scholarly Literature & Peer-Reviewed Research Repository
+  try {
+    const crossrefUrl = `https://api.crossref.org/works?query=${encodeURIComponent(contextQuery)}&rows=3&select=title,URL,container-title,published`;
+    const res = await fetch(crossrefUrl, {
+      headers: { 'User-Agent': 'VeriCheckAcademic/2.0 (mailto:scholar-check@example.com)' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      for (const item of (data.message?.items || [])) {
+        const title = item.title?.[0];
+        if (title && item.URL) {
+          const journal = item['container-title']?.[0] || 'Peer-Reviewed Journal';
+          const year = item.published?.['date-parts']?.[0]?.[0] || '';
+          articles.push({
+            title: title,
+            url: item.URL,
+            snippet: `Scholarly Paper in ${journal} ${year ? `(${year})` : ''} - Academic Research Database`
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Crossref academic search error:', err.message);
+  }
+
+  // 2. Wikipedia Reference Encyclopedia
   try {
     const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(contextQuery)}&utf8=&format=json`;
     const res = await fetch(wikiUrl, { headers: { 'User-Agent': 'VeriCheckAcademic/2.0' } });
     if (res.ok) {
       const data = await res.json();
-      for (const item of (data.query?.search || []).slice(0, 4)) {
+      for (const item of (data.query?.search || []).slice(0, 2)) {
         articles.push({
           title: item.title,
           url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
@@ -191,8 +256,9 @@ async function fetchContextArticles(contextQuery) {
       }
     }
   } catch (e) {
-    console.error('Context articles fetch error:', e);
+    console.error('Wiki context error:', e.message);
   }
+
   return articles;
 }
 
